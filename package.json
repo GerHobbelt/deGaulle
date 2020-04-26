@@ -4,6 +4,9 @@
   "description": "static website generator with attitude, control and verification too",
   "main": "index.js",
   "scripts": {
+    "build": "npm test",
+    "format": "prettier-standard --format",
+    "prettier": "prettier-standard",
     "test": "make test"
   },
   "repository": {
@@ -25,5 +28,12 @@
   "bugs": {
     "url": "https://github.com/GerHobbelt/deGaulle/issues"
   },
-  "homepage": "https://github.com/GerHobbelt/deGaulle#readme"
+  "homepage": "https://github.com/GerHobbelt/deGaulle#readme",
+  "devDependencies": {
+    "@gerhobbelt/live-server": "^1.3.1-28",
+    "@gerhobbelt/markdown-it": "^10.0.0-32",
+    "@gerhobbelt/nomnom": "^1.8.4-29",
+    "glob": "^7.1.6",
+    "prettier-standard": "^16.3.0"
+  }
 }
