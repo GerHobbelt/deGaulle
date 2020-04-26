@@ -109,5 +109,22 @@ At the time of this writing, the decision is "inconclusive". Anyway, there's sev
 
 
 
+## For deGaulle Developers
+
+- `git clone`
+- `npm -i`
+- `npm link` -- this will "install" deGaulle as a local command so you can run it as easily as any user
+- *do what you gotta do*
+
+  And choose any of these when you feel the need:
+  + `npm run build`
+  + `npm test`         -- if all you want to do now is run the tests
+  + `npm run format`   -- that's `prettier` without the linting. Handy when your code isn't all shipshape yet.
+  + `npm run prettier`
+- `git commit`
+- `git push`
+- (if you want to publish as / update the package) `npm run pub`
+
+
 
 

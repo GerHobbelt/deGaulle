@@ -2,12 +2,16 @@
   "name": "deGaulle",
   "version": "1.0.0-1",
   "description": "static website generator with attitude, control and verification too",
+  "bin": {
+    "deGaulle": "src/cli.js"
+  },
   "main": "index.js",
   "scripts": {
     "build": "npm test",
     "format": "prettier-standard --format",
     "prettier": "prettier-standard",
-    "test": "make test"
+    "test": "make test",
+    "pub": "npm publish --access public"
   },
   "repository": {
     "type": "git",
