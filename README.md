@@ -31,14 +31,14 @@ Also, *deGaulle* will help out in rewriting all the links in your generated page
 - produce websites which are SEO friendly, fully static where they can be. *Totally google-able, I must be.*
 - produce websites which require as little maintenance & anti-hacker supervision as possible: if *you* don't want JavaScript in the result, *deGaulle* is your man.
 
-  > If you wish to inject client-side code, be my guest, but know that we can do without. The goal is to keep the total attack surface as lean & mean as possible. Once published, your attention should allowed to be focused *elsewhere*, until the next site update!
+  > If you wish to inject client-side code, be my guest, but know that we can do without. The goal is to keep the total attack surface as lean & mean as possible. Once published, your attention should be focused *elsewhere*, until the next site update!
   
 - no "opinionated" source directory layout, thank you very much.
 - scan a directory tree and process everything in there. Userland code/config will tell us what to do with each, when defaults for type don't suffice.
 
   > Technically, I want something of a wildcarded [`glob`](https://www.npmjs.com/package/glob) scan of the entire kaboodle and then userland filters can decide what to do, if the *deGaulle* doesn't already do what you want by default.
   
-- verify reachability and report any "dangling items" (which Google won't be to find easily)
+- verify reachability and report any "dangling items" (which Google won't be able to find easily)
 - find and report all site-internal "unconnected links" (which will produce a 404 in production)
 - provide an easy means to *map* source paths to target URIs using userland code: the user must have total flexibility in naming.
   + include duplicate/collision checks and a resolve mechanism
@@ -63,14 +63,14 @@ Also, *deGaulle* will help out in rewriting all the links in your generated page
 
 ## Causation  
 
-I tried several SSGs, including such different animals as vuepress, wintersmith and eleventy, but ultimately the problem with each is that, in order to achive my goals, I had to dig down *deep* into the core of those frameworks/generators and was lossing quite a bit of time while the results were... sub-par at best. 
+I tried several SSGs, including such different animals as vuepress, wintersmith and eleventy, but ultimately the problem with each is that, in order to achive my goals, I had to dig down *deep* into the core of those frameworks/generators and was loosing quite a bit of time while the results were... sub-par at best. 
 
 > Quite possibly some large chunks of this work can be imported into eleventy (which came closest to what I'd like). When the time comes, we'll see if that's an option.
 
 
 ### NIH, y'all?
 
-Given the Goals set above, this sounds a lot like a redo of eleventy (with some particular sprinkles on top), and unfortunately it is. But after spending some serious time with eleventy, I think I will be faster rolling my own than hacking in the internals of eleventy as that  one has flexibilities and consequent code complexities that I don't want or need: *deGaulle* is not targeting **site migration** but is primarily aimed at **new site construction**. If *deGaulle* is useful for migrating another site, that's nice, but only a happy coincidence.
+Given the Goals set above, this sounds a lot like a redo of eleventy (with some particular sprinkles on top), and unfortunately it is. But after spending some serious time with eleventy, I think I will be faster rolling my own than hacking in the internals of eleventy as that one has flexibilities and consequent code complexities that I don't want or need: *deGaulle* is not targeting **site migration** but is primarily aimed at **new site construction**. If *deGaulle* is useful for migrating another site, that's nice, but only a happy coincidence.
 
 
 
