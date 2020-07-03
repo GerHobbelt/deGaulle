@@ -17,7 +17,7 @@ const fs = require('fs');
 
 const config = {
   docTreeBasedir: null,
-  destinationPath: null,
+  destinationPath: null
 };
 
 nomnom.script('deGaulle');
@@ -110,7 +110,7 @@ nomnom.parse();
 
 
 function absSrcPath(rel) {
-  let p = path.join(__dirname, config.docTreeBasedir, rel);
+  let p = path.join(config.docTreeBasedir, rel);
   return path.resolve(p);
 }
 
@@ -179,9 +179,9 @@ function buildWebsite(opts, command) {
     // - README.md
     let indexFile;
     let indexFilePriority = 0;
-    let scanPath = path.join(firstEntryPointPath,'*.{md,htm,html}');
+    let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
     scanPath = scanPath.replace(/\\/g, '/');
-    console.log("scanPath:", scanPath);
+    console.log('scanPath:', scanPath);
     let files = glob.sync(scanPath, {
       nosort: true,
       nocase: true,
@@ -241,7 +241,7 @@ function buildWebsite(opts, command) {
   }
 
   config.docTreeBasedir = path.dirname(firstEntryPointPath);
-  console.log("config:", config);
+  console.log('config:', config);
 
   let md = MarkDown({
     // Enable HTML tags in source
@@ -284,7 +284,8 @@ function buildWebsite(opts, command) {
     //default_attributes: { a: [['rel', 'nofollow']] }
   });
 
-  mdPluginCollective(md, {
+  console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
+  mdPluginCollective.use_dirty_dozen(md, {
     abbr: {
       abbreviations: readTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
       links:         readTxtConfigFile('.deGaulle/abbr-links.txt'),
@@ -293,9 +294,7 @@ function buildWebsite(opts, command) {
 
     include: {
       root: absSrcPath('.')
-    },
-
-    wikilinks: true
+    }
   });
 
   console.log(`processing root file: ${firstEntryPointPath}...`);

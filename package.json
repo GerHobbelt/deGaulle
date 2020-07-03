@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@gerhobbelt/markdown-it": "11.0.1-41",
-    "@gerhobbelt/markdown-it-testgen": "0.1.6-8",
+    "@gerhobbelt/markdown-it-testgen": "0.1.6-9",
     "@gerhobbelt/nomnom": "1.8.4-30",
     "@gerhobbelt/prismjs": "1.20.1-2",
     "globby": "11.0.1",
@@ -50,7 +50,7 @@
     "@gerhobbelt/prepend-header": "1.0.8-3",
     "ava": "3.9.0",
     "cross-env": "7.0.2",
-    "eslint": "7.3.1",
+    "eslint": "7.4.0",
     "microbundle": "0.12.2",
     "nyc": "15.1.0",
     "prettier-standard": "16.3.0"

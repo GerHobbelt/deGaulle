@@ -18,12 +18,16 @@
 
   const pkg = require('../package.json');
 
-  const glob = require('glob');
+  const glob = require('globby');
 
   const path = require('path');
 
   const fs = require('fs');
 
+  const config = {
+    docTreeBasedir: null,
+    destinationPath: null
+  };
   nomnom.script('deGaulle');
   nomnom.command('build').option('debug', {
     abbr: 'd',
@@ -87,11 +91,9 @@
   nomnom.parse(); // -- done --
 
   function absSrcPath(rel) {
-    let p = path.join(__dirname, '..', rel);
+    let p = path.join(config.docTreeBasedir, rel);
     return path.resolve(p);
   }
-
-  const destinationPath = absSrcPath('../docs/');
 
   function readTxtConfigFile(rel) {
     let p = path.resolve(absSrcPath(rel));
@@ -129,7 +131,14 @@
       throw new Error('Must specify at least one file path as starting point. None were specified.');
     }
 
-    let firstEntryPointPath = paths[0];
+    let firstEntryPointPath = paths[0]; // make sure we start with an absolute path; everything will derived off this one.
+
+    if (!path.isAbsolute(firstEntryPointPath)) {
+      firstEntryPointPath = path.join(process.cwd(), firstEntryPointPath);
+    }
+
+    firstEntryPointPath = path.normalize(firstEntryPointPath);
+    console.log('firstEntryPointPath = ', firstEntryPointPath);
     let entryStats = fs.lstatSync(firstEntryPointPath);
 
     if (entryStats && entryStats.isDirectory()) {
@@ -139,7 +148,9 @@
       // - README.md
       let indexFile;
       let indexFilePriority = 0;
-      let scanPath = firstEntryPointPath + '/*.{md,htm,html}';
+      let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
+      scanPath = scanPath.replace(/\\/g, '/');
+      console.log('scanPath:', scanPath);
       let files = glob.sync(scanPath, {
         nosort: true,
         nocase: true,
@@ -196,6 +207,8 @@
       throw new Error(`entry point is not a file: ${firstEntryPointPath}`);
     }
 
+    config.docTreeBasedir = path.dirname(firstEntryPointPath);
+    console.log('config:', config);
     let md = MarkDown({
       // Enable HTML tags in source
       html: true,
@@ -238,7 +251,8 @@
       //default_attributes: { a: [['rel', 'nofollow']] }
 
     });
-    mdPluginCollective(md, {
+    console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
+    mdPluginCollective.use_dirty_dozen(md, {
       abbr: {
         abbreviations: readTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
         links: readTxtConfigFile('.deGaulle/abbr-links.txt'),
@@ -246,8 +260,7 @@
       },
       include: {
         root: absSrcPath('.')
-      },
-      wikilinks: true
+      }
     });
     console.log(`processing root file: ${firstEntryPointPath}...`);
     fs.readFile(firstEntryPointPath, {
