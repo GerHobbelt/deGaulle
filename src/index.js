@@ -5,17 +5,23 @@ const nomnom = require('@gerhobbelt/nomnom');
 
 const MarkDown = require('@gerhobbelt/markdown-it');
 
-const prism = require('@gerhobbelt/markdown-it-prism');
+const mdPluginCollective = require('markdown-it-dirty-dozen');
 
 const pkg = require('../package.json');
 
-const glob = require('glob');
+const glob = require('globby');
 
 const path = require('path');
-
 const fs = require('fs');
 
+
+const config = {
+  docTreeBasedir: null,
+  destinationPath: null,
+};
+
 nomnom.script('deGaulle');
+
 nomnom
   .command('build')
   .option('debug', {
@@ -37,6 +43,7 @@ nomnom
     }
   })
   .help('build website from sources');
+
 nomnom
   .command('sanity')
   .option('debug', {
@@ -65,6 +72,7 @@ nomnom
     }
   })
   .help('run the sanity tests');
+
 nomnom
   .nocommand()
   .option('debug', {
@@ -92,18 +100,61 @@ nomnom
       process.exit(5);
     }
   });
-nomnom.parse(); // -- done --
+
+nomnom.parse();
+
+
+
+// -- done --
+
+
+
+function absSrcPath(rel) {
+  let p = path.join(__dirname, config.docTreeBasedir, rel);
+  return path.resolve(p);
+}
+
+function absDstPath(rel) {
+  if (!config.destinationPath) {
+    config.destinationPath = absSrcPath('../docs/');
+  }
+  let p = path.join(config.destinationPath, rel);
+  return path.resolve(p);
+}
+
+function readTxtConfigFile(rel) {
+  let p = path.resolve(absSrcPath(rel));
+  let src = fs.readFileSync(p, 'utf8');
+  // - split into lines
+  // - filter out any lines whicch don't have an '='
+  // - split each line across the initial '=' in there.
+  // - turn this into a hash table?
+  let lines = src.split(/[\r\n]/g);
+  lines = lines.filter((l) => l.trim().length > 1 && l.includes('=')).map((l) => {
+    let parts = l.split('=');
+    if (parts.length !== 2) {
+      throw new Error(`config line in ${rel} is expected to have only one '='`);
+    }
+    parts = parts.map((l) => l.trim());
+    return parts;
+  });
+  let rv = {};
+  lines.forEach((l) => {
+    rv[l[0]] = l[1];
+  });
+  return rv;
+}
 
 function buildWebsite(opts, command) {
   console.log(
-    `buildWebsite: ${command || '<no-command>'}, opts: ${JSON.stringify(
+    `buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(
       opts,
       null,
       2
     )}`
   );
-  let paths = opts._;
-  let minPathsCount = 1 + (command ? 1 : 0);
+  let paths = opts._.slice(command ? 1 : 0);
+  const minPathsCount = 1;
 
   if (!paths || paths.length < minPathsCount) {
     throw new Error(
@@ -111,7 +162,14 @@ function buildWebsite(opts, command) {
     );
   }
 
-  let firstEntryPointPath = paths[minPathsCount - 1];
+  let firstEntryPointPath = paths[0];
+  // make sure we start with an absolute path; everything will derived off this one.
+  if (!path.isAbsolute(firstEntryPointPath)) {
+    firstEntryPointPath = path.join(process.cwd(), firstEntryPointPath);
+  }
+  firstEntryPointPath = path.normalize(firstEntryPointPath);
+  console.log('firstEntryPointPath = ', firstEntryPointPath);
+
   let entryStats = fs.lstatSync(firstEntryPointPath);
 
   if (entryStats && entryStats.isDirectory()) {
@@ -121,14 +179,16 @@ function buildWebsite(opts, command) {
     // - README.md
     let indexFile;
     let indexFilePriority = 0;
-    let scanPath = firstEntryPointPath + '/*.{md,htm,html}';
+    let scanPath = path.join(firstEntryPointPath,'*.{md,htm,html}');
+    scanPath = scanPath.replace(/\\/g, '/');
+    console.log("scanPath:", scanPath);
     let files = glob.sync(scanPath, {
       nosort: true,
       nocase: true,
       nodir: true,
       nobrace: false
     });
-    console.log(`empty point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+    console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
     for (const f of files || []) {
       switch (path.basename(f.toLowerCase())) {
@@ -180,6 +240,9 @@ function buildWebsite(opts, command) {
     throw new Error(`entry point is not a file: ${firstEntryPointPath}`);
   }
 
+  config.docTreeBasedir = path.dirname(firstEntryPointPath);
+  console.log("config:", config);
+
   let md = MarkDown({
     // Enable HTML tags in source
     html: true,
@@ -220,9 +283,22 @@ function buildWebsite(opts, command) {
     } // Configure default attributes for given tags
     //default_attributes: { a: [['rel', 'nofollow']] }
   });
-  md.use(prism, {
-    /* options */
+
+  mdPluginCollective(md, {
+    abbr: {
+      abbreviations: readTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
+      links:         readTxtConfigFile('.deGaulle/abbr-links.txt'),
+      emphasis:      readTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
+    },
+
+    include: {
+      root: absSrcPath('.')
+    },
+
+    wikilinks: true
   });
+
+  console.log(`processing root file: ${firstEntryPointPath}...`);
   fs.readFile(
     firstEntryPointPath,
     {
@@ -235,8 +311,58 @@ function buildWebsite(opts, command) {
         );
       }
 
-      let content = md.render(data); //console.log(content);
+      let env = {};
+
+      console.log('source:\n', data);
+
+      // let content = md.render(data); --> .parse + .renderer.render
+      //
+      // .parse --> new state + process: return tokens
+      // let tokens = md.parse(data, env)
+      let state = new md.core.State(data, md, env);
+      md.core.process(state);
+      let tokens = state.tokens;
+
+      console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
+
+      let content = md.renderer.render(tokens, md.options, env);
+
+      console.log('output:\n', content);
+
+
     }
   );
 }
-//# sourceMappingURL=index.js.map
+
+function cleanTokensForDisplay(tokens) {
+  let rv = [];
+  for (let i in tokens) {
+    let t = tokens[i];
+    t = cleanSingleTokenForDisplay(t);
+    if (t.children) {
+      t.children = cleanTokensForDisplay(t.children);
+    }
+    rv[i] = t;
+  }
+  return rv;
+}
+
+function cleanSingleTokenForDisplay(token) {
+  let rv = {};
+  for (let attr in token) {
+    if (token[attr] !== '' && token[attr] != null) {
+      rv[attr] = token[attr];
+    }
+  }
+  return rv;
+}
+
+// https://vuepress.vuejs.org/plugin/life-cycle.html#generated
+async function mdGenerated(pagePaths) {
+  // cp docs-src/.nojekyll docs/ && cp docs-src/CNAME docs/
+  console.error('async generated HIT');
+
+  fs.writeFileSync(absDstPath('CNAME'), 'qiqqa.org\n', 'utf8');
+
+  fs.writeFileSync(absDstPath('.nojekyll'), '');
+}
