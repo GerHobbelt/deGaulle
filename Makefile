@@ -90,7 +90,8 @@ report-config:
 
 
 doc:
-	npx deGaulle build docs-src/
+	npx deGaulle build ../qiqqa/docs-src/ ./docs/
+	#npx deGaulle build docs-src/
 
 
 .PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle

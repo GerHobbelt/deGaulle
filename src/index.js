@@ -9,10 +9,14 @@ const mdPluginCollective = require('markdown-it-dirty-dozen');
 
 const pkg = require('../package.json');
 
-const glob = require('globby');
+const glob = require('glob');
+const assert = require('assert');
+const _ = require('lodash');
 
 const path = require('path');
 const fs = require('fs');
+
+const DEBUG = false;
 
 
 const config = {
@@ -109,43 +113,84 @@ nomnom.parse();
 
 
 
+function unixify(path) {
+  return path.replace(/\\/g, '/');
+}
+
 function absSrcPath(rel) {
   let p = path.join(config.docTreeBasedir, rel);
-  return path.resolve(p);
+  return unixify(path.resolve(p));
 }
 
 function absDstPath(rel) {
   if (!config.destinationPath) {
-    config.destinationPath = absSrcPath('../docs/');
+    throw new Error('Internal error: used too early');
   }
   let p = path.join(config.destinationPath, rel);
-  return path.resolve(p);
+  return unixify(path.resolve(p));
 }
 
-function readTxtConfigFile(rel) {
-  let p = path.resolve(absSrcPath(rel));
-  let src = fs.readFileSync(p, 'utf8');
+function readOptionalTxtConfigFile(rel) {
+  let p = absSrcPath(rel);
+  if (fs.existsSync(p)) {
+    let src = fs.readFileSync(p, 'utf8');
   // - split into lines
   // - filter out any lines whicch don't have an '='
   // - split each line across the initial '=' in there.
   // - turn this into a hash table?
-  let lines = src.split(/[\r\n]/g);
-  lines = lines.filter((l) => l.trim().length > 1 && l.includes('=')).map((l) => {
-    let parts = l.split('=');
-    if (parts.length !== 2) {
-      throw new Error(`config line in ${rel} is expected to have only one '='`);
-    }
-    parts = parts.map((l) => l.trim());
-    return parts;
-  });
-  let rv = {};
-  lines.forEach((l) => {
-    rv[l[0]] = l[1];
-  });
-  return rv;
+    let lines = src.split(/[\r\n]/g);
+    lines = lines.filter((l) => l.trim().length > 1 && l.includes('=')).map((l) => {
+      let parts = l.split('=');
+      if (parts.length !== 2) {
+        throw new Error(`config line in ${rel} is expected to have only one '='`);
+      }
+      parts = parts.map((l) => l.trim());
+      return parts;
+    });
+    let rv = {};
+    lines.forEach((l) => {
+      rv[l[0]] = l[1];
+    });
+    return rv;
+  }
+  return {};
 }
 
-function buildWebsite(opts, command) {
+function myCustomPageNamePostprocessor(spec) {
+  // clean up unwanted characters
+  spec = spec.replace(/ :: /g, '/');
+  spec = spec.replace(/ --+ /g, '/');
+  spec = _.deburr(spec).trim();
+  // normalize case
+  spec = spec.toLowerCase();
+  spec = spec
+      .replace(/[^\w\d\s\/_-]/g, '_');
+  spec = spec
+      .replace(/__+/g, '_');
+  spec = spec
+      .replace(/\s+/g, ' ');
+  console.log('myCustomPageNamePostprocessor STAGE 1', spec);
+  spec = spec
+      .replace(/_-_/g, '_');
+  spec = spec
+      .replace(/ - /g, ' ');
+  spec = spec
+      .replace(/[ _]* [ _]*/g, ' ');
+  console.log('myCustomPageNamePostprocessor STAGE 2', spec);
+  spec = spec
+      .replace(/(^|\/)[ _]+/g, '$1');
+  spec = spec
+      .replace(/[ _]+($|\/)/g, '$1');
+  console.log('myCustomPageNamePostprocessor STAGE 3', spec);
+  spec = spec
+      .replace(/ /g, '.');
+  console.log('myCustomPageNamePostprocessor STAGE 4', spec);
+
+
+  return spec;
+}
+
+async function buildWebsite(opts, command) {
   console.log(
     `buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(
       opts,
@@ -180,13 +225,16 @@ function buildWebsite(opts, command) {
     let indexFile;
     let indexFilePriority = 0;
     let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
-    scanPath = scanPath.replace(/\\/g, '/');
+    scanPath = unixify(scanPath);
     console.log('scanPath:', scanPath);
     let files = glob.sync(scanPath, {
       nosort: true,
-      nocase: true,
+      nomount: true,
+      nounique: false,
+      //nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
       nodir: true,
-      nobrace: false
+      nobrace: false,
+      gitignore: true
     });
     console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
@@ -241,7 +289,140 @@ function buildWebsite(opts, command) {
   }
 
   config.docTreeBasedir = path.dirname(firstEntryPointPath);
+
+
+  let outputDirPath = paths[1] || path.join(config.docTreeBasedir, (!config.docTreeBasedir.endsWith('docs') ? '../docs' : '../' + path.basename(config.docTreeBasedir) + '-output'));
+  // make sure we start with an absolute path; everything will derived off this one.
+  if (!path.isAbsolute(outputDirPath)) {
+    outputDirPath = path.join(process.cwd(), outputDirPath);
+  }
+  outputDirPath = path.normalize(outputDirPath);
+  console.log('outputDirPath = ', outputDirPath);
+  config.destinationPath = outputDirPath;
+
+  config.outputDirRelativePath = unixify(path.relative(config.docTreeBasedir, config.destinationPath));
+
   console.log('config:', config);
+
+
+  // now scan the entire tree: collect potential files for comparison & treatment
+  //
+  // Produces an array of categories, which each are an array of file records,
+  // where each file record has this format:
+  //
+  // {
+  //   path,        -- full path to file
+  //   nameLC       -- lowercased filename
+  //   ext          -- lowercased filename extension
+  //   relativePath --  relative path to config.docTreeBasedir
+  // }
+  //
+  async function collectAllFiles() {
+    let scanPath = path.join(config.docTreeBasedir, '**/*');
+    scanPath = unixify(scanPath);
+    console.log('scanPath:', scanPath);
+
+    return new Promise((resolve, reject) => {
+      glob(scanPath, {
+        nosort: true,
+        nomount: true,
+        nounique: false,
+      //nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
+        nodir: true,
+        nobrace: false,
+        gitignore: true
+      }, function processGlobResults(err, files) {
+        if (err) {
+          reject(new Error(`glob scan error: ${err}`));
+          return;
+        }
+
+        console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+
+        let rv = {
+          markdown: new Map(),
+          html: new Map(),
+          css: new Map(),
+          js: new Map(),
+          image: new Map(),
+          movie: new Map(),
+          misc: new Map(),
+          _: new Map()
+        };
+        const rv_mapping_def = {
+          markdown: [
+            'md',
+            'markdown'
+          ],
+          html: [
+            'html',
+            'htm'
+          ],
+          js: [
+            'js',
+            'mjs',
+            'ejs',
+            'ts',
+            'coffee'
+          ],
+          css: [
+            'css',
+            'scss',
+            'less',
+            'styl',
+            'stylus'
+          ],
+          image: [
+            'png',
+            'gif',
+            'jpg',
+            'jpeg',
+            'tiff',
+            'bmp',
+            'svg',
+            'psd',
+            'ai'
+          ],
+          movie: [
+            'mkv',
+            'mp4',
+            'avi',
+            'mov',
+            'flv'
+          ]
+        };
+        let rv_mapping = new Map();
+        for (let n in rv_mapping_def) {
+          let a = rv_mapping_def[n];
+          console.log('key n', { n, a });
+          for (let b of a) {
+            console.log('map n -> b', { n, b });
+            rv_mapping.set('.' + b, n);
+          }
+        }
+
+        console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
+
+        for (const f of files || []) {
+          let fname = path.basename(f.toLowerCase());
+          let ext = path.extname(fname);
+          let el = {
+            path: f,
+            nameLC: fname,
+            ext: ext,
+            relativePath: unixify(path.relative(config.docTreeBasedir, f))
+          };
+          let cat = rv_mapping.get(ext) || 'misc';
+          rv[cat].set(f, el);
+          rv._.set(f, el);
+        }
+        resolve(rv);
+      });
+    });
+  }
+
+  // async invocation, but don't wait for it yet:
+  let scan = collectAllFiles();
 
   let md = MarkDown({
     // Enable HTML tags in source
@@ -284,54 +465,188 @@ function buildWebsite(opts, command) {
     //default_attributes: { a: [['rel', 'nofollow']] }
   });
 
+  // augment the md instance for use with the markdown_it_include plugin:
+  //md.getIncludeRootDir = ...
+
   console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
   mdPluginCollective.use_dirty_dozen(md, {
     abbr: {
-      abbreviations: readTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
-      links:         readTxtConfigFile('.deGaulle/abbr-links.txt'),
-      emphasis:      readTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
+      abbreviations: readOptionalTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
+      links:         readOptionalTxtConfigFile('.deGaulle/abbr-links.txt'),
+      emphasis:      readOptionalTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
     },
 
     include: {
-      root: absSrcPath('.')
+      root: '/bogus/',
+      getRootDir: (options, state, startLine, endLine) => state.env.getIncludeRootDir(options, state, startLine, endLine)
+    },
+
+    wikilinks: {
+      postProcessPageName: myCustomPageNamePostprocessor
     }
   });
 
+
+  let allFiles = await scan;
+  if (DEBUG)  console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
+
+  if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
+    throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
+  }
+
+
+
   console.log(`processing root file: ${firstEntryPointPath}...`);
-  fs.readFile(
-    firstEntryPointPath,
-    {
-      encoding: 'utf8'
-    },
-    (err, data) => {
-      if (err) {
-        throw new Error(
-          `ERROR: read error ${err} for file ${firstEntryPointPath}`
-        );
-      }
+  let specRec = await compileMD(firstEntryPointPath, md, allFiles);
 
-      let env = {};
+  if (DEBUG) console.log('specRec:', specRec);
 
-      console.log('source:\n', data);
+  // now process the other MD files too:
+  for (let slot of allFiles.markdown) {
+    let key = slot[0];
+    let entry = slot[1];
+    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+    if (DEBUG)     console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
 
-      // let content = md.render(data); --> .parse + .renderer.render
-      //
-      // .parse --> new state + process: return tokens
-      // let tokens = md.parse(data, env)
-      let state = new md.core.State(data, md, env);
-      md.core.process(state);
-      let tokens = state.tokens;
+    if (!entry.HtmlContent) {
+      let specRec2 = await compileMD(key, md, allFiles);
 
-      console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
-
-      let content = md.renderer.render(tokens, md.options, env);
-
-      console.log('output:\n', content);
-
-
+      if (DEBUG) console.log('specRec:', specRec2);
+      assert.strictEqual(specRec2, entry);
     }
-  );
+  }
+
+  // now process the HTML files:
+  for (let slot of allFiles.html) {
+    let key = slot[0];
+    let entry = slot[1];
+    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+    if (DEBUG)     console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
+
+    if (!entry.HtmlContent) {
+      let specRec2 = await loadHTML(key, allFiles);
+
+      if (DEBUG) console.log('specRec:', specRec2);
+      assert.strictEqual(specRec2, entry);
+    }
+  }
+
+  // now's the time to match the links in the generated content and do some linkage reporting alongside:
+  //
+  
 }
+
+
+
+async function compileMD(mdPath, md, allFiles) {
+  console.log(`processing file: ${mdPath}...`);
+
+  return new Promise((resolve, reject) => {
+    fs.readFile(
+      mdPath,
+      {
+        encoding: 'utf8'
+      },
+      async (err, data) => {
+        if (err) {
+          reject(new Error(
+            `ERROR: read error ${err} for file ${mdPath}`
+          ));
+          return;
+        }
+
+        let env = {};
+
+        if (DEBUG)          console.log('source:\n', data);
+
+        // augment the md instance for use with the markdown_it_include plugin:
+        env.getIncludeRootDir = function (options, state, startLine, endLine) {
+          if (DEBUG)          console.log('##### include root dir is today:', { dir: path.dirname(mdPath) });
+          return path.dirname(mdPath);
+        };
+
+        // let content = md.render(data); --> .parse + .renderer.render
+        //
+        // .parse --> new state + process: return tokens
+        // let tokens = md.parse(data, env)
+        let state = new md.core.State(data, md, env);
+        md.core.process(state);
+        let tokens = state.tokens;
+
+        //console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
+
+        let typeMap = new Set();
+        traverseTokens(tokens, (t, idx, arr, depth) => {
+          typeMap.add(t.type);
+        });
+        console.log('token types:', typeMap);
+
+        if (0) {
+          let position = 0;
+          let prevToken = null;
+          traverseTokens(tokens, (t, idx, arr, depth) => {
+            if (!Number.isFinite(t.position)) {
+              console.error('erroneous token position:', t);
+              return;
+            }
+            if (!Number.isFinite(t.size)) {
+              console.error('erroneous token size:', t);
+              return;
+            }
+            if (t.position >= position) {
+              position = t.position;
+            } else {
+              console.warn('token position is dropping back / reversing:', { position, t, prevToken });
+            }
+            prevToken = t;
+          });
+        }
+
+        let content = md.renderer.render(tokens, md.options, env);
+
+        if (DEBUG) console.log('output:\n', content);
+
+          // update the file record:
+        let el = allFiles.markdown.get(mdPath);
+        el.HtmlContent = content;
+
+        resolve(el);
+      }
+    );
+  });
+}
+
+
+
+async function loadHTML(htmlPath, allFiles) {
+  console.log(`processing file: ${htmlPath}...`);
+
+  return new Promise((resolve, reject) => {
+    fs.readFile(
+      htmlPath,
+      {
+        encoding: 'utf8'
+      },
+      async (err, data) => {
+        if (err) {
+          reject(new Error(
+            `ERROR: read error ${err} for file ${htmlPath}`
+          ));
+          return;
+        }
+
+        if (DEBUG)          console.log('source:\n', data);
+
+          // update the file record:
+        let el = allFiles.html.get(htmlPath);
+        el.HtmlContent = data;
+
+        resolve(el);
+      }
+    );
+  });
+}
+
 
 function cleanTokensForDisplay(tokens) {
   let rv = [];
@@ -364,4 +679,16 @@ async function mdGenerated(pagePaths) {
   fs.writeFileSync(absDstPath('CNAME'), 'qiqqa.org\n', 'utf8');
 
   fs.writeFileSync(absDstPath('.nojekyll'), '');
+}
+
+function traverseTokens(tokens, cb, depth) {
+  depth = depth || 0;
+  for (let i = 0, len = tokens.length; i < len; i++) {
+    let t = tokens[i];
+    cb(t, i, tokens, depth);
+
+    if (t.children) {
+      traverseTokens(t.children, cb, depth + 1);
+    }
+  }
 }
