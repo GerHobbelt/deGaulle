@@ -18,7 +18,7 @@
   "bin": {
     "deGaulle": "src/cli.js"
   },
-  "source": "src/index.js",
+  "source": "src/index.ts",
   "main": "dist/deGaulle.js",
   "module": "dist/deGaulle.mjs",
   "engines": {
@@ -44,17 +44,21 @@
     "@gerhobbelt/markdown-it-testgen": "0.1.6-17",
     "@gerhobbelt/nomnom": "1.8.4-30",
     "@gerhobbelt/prismjs": "1.20.1-2",
-    "jsdom": "^16.3.0",
+    "jsdom": "16.3.0",
     "markdown-it-dirty-dozen": "file:../../js/markdown-it-dirty-dozen"
   },
   "devDependencies": {
     "@gerhobbelt/live-server": "1.3.1-28",
     "@gerhobbelt/prepend-header": "1.0.8-3",
+    "@typescript-eslint/eslint-plugin": "3.8.0",
+    "@typescript-eslint/parser": "3.8.0",
     "ava": "3.11.1",
     "cross-env": "7.0.2",
     "eslint": "7.6.0",
     "microbundle": "0.12.3",
     "nyc": "15.1.0",
-    "prettier-standard": "16.4.1"
+    "prettier-standard": "16.4.1",
+    "typescript": "3.9.7",
+    "typescript-eslint": "0.0.1-alpha.0"
   }
 }

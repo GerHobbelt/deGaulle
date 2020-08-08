@@ -1,9 +1,21 @@
+root: true
+parser: '@typescript-eslint/parser'
+
 env:
   node: true
   browser: false
   es6: true
 
-extends: eslint:recommended
+extends: 
+  [ 
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+  ]
+
+plugins: 
+  [
+    '@typescript-eslint',
+  ]
 
 parserOptions:
   ecmaVersion: 2020
@@ -168,3 +180,7 @@ rules:
   use-isnan: 2
   valid-typeof: 2
   yoda: [2, never, { 'exceptRange': true }]
+
+  '@typescript-eslint/no-var-requires': 1
+  prefer-const: 1
+  
