@@ -190,21 +190,22 @@ function _forOf(target, body, check) {
   }, check);
 }
 
-const loadFixedAssetBinaryFile = function (filePath, allFiles) {
+const loadFixedAssetBinaryFile = function (filePath, allFiles, collection) {
   try {
     console.log(`processing file: ${filePath}...`);
     return Promise.resolve(new Promise((resolve, reject) => {
-      fs.readFile(htmlPath, {
+      fs.readFile(filePath, {
         encoding: 'utf8'
       }, function (err, data) {
         try {
           if (err) {
-            reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+            reject(new Error(`ERROR: read error ${err} for file ${filePath}`));
             return Promise.resolve();
           }
 
           if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
 
+          const el = collection.get(filePath);
           resolve(el);
           return Promise.resolve();
         } catch (e) {
@@ -354,21 +355,22 @@ function _switch(discriminant, cases) {
   }
 }
 
-const loadFixedAssetTextFile = function (filePath, allFiles) {
+const loadFixedAssetTextFile = function (filePath, allFiles, collection) {
   try {
     console.log(`processing file: ${filePath}...`);
     return Promise.resolve(new Promise((resolve, reject) => {
-      fs.readFile(htmlPath, {
+      fs.readFile(filePath, {
         encoding: 'utf8'
       }, function (err, data) {
         try {
           if (err) {
-            reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+            reject(new Error(`ERROR: read error ${err} for file ${filePath}`));
             return Promise.resolve();
           }
 
           if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
 
+          const el = collection.get(filePath);
           el.RawContent = data;
           resolve(el);
           return Promise.resolve();
@@ -421,7 +423,7 @@ const loadHTML = function (htmlPath, allFiles) {
             head: headEl.innerHTML
           }); // update the file record:
 
-          let el = allFiles.html.get(htmlPath);
+          const el = allFiles.html.get(htmlPath);
           el.HtmlContent = bodyEl.innerHTML;
           el.HtmlHeadContent = headEl.innerHTML;
           el.HtmlBody = bodyEl;
@@ -451,7 +453,9 @@ const compileMD = function (mdPath, md, allFiles) {
             return Promise.resolve();
           }
 
-          let env = {};
+          const env = {
+            getIncludeRootDir: null
+          };
           if (DEBUG >= 8) console.log('source:\n', data); // augment the md instance for use with the markdown_it_include plugin:
 
           env.getIncludeRootDir = function (options, state, startLine, endLine) {
@@ -465,11 +469,11 @@ const compileMD = function (mdPath, md, allFiles) {
           // let tokens = md.parse(data, env)
 
 
-          let state = new md.core.State(data, md, env);
+          const state = new md.core.State(data, md, env);
           md.core.process(state);
-          let tokens = state.tokens;
+          const tokens = state.tokens;
           if (DEBUG >= 10) console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
-          let typeMap = new Set();
+          const typeMap = new Set();
           traverseTokens(tokens, (t, idx, arr, depth) => {
             typeMap.add(t.type);
             markdownTokens[t.type] = true;
@@ -504,7 +508,7 @@ const compileMD = function (mdPath, md, allFiles) {
             });
           }
 
-          let content = md.renderer.render(tokens, md.options, env);
+          const content = md.renderer.render(tokens, md.options, env);
           if (DEBUG >= 4) console.log('output:\n', content);
           const dom = new JSDOM('<html><head>\n' + content, {
             includeNodeLocations: true
@@ -519,7 +523,7 @@ const compileMD = function (mdPath, md, allFiles) {
             head: headEl.innerHTML
           }); // update the file record:
 
-          let el = allFiles.markdown.get(mdPath);
+          const el = allFiles.markdown.get(mdPath);
           if (DEBUG >= 3) console.log('update the file record:', {
             mdPath,
             el
@@ -566,7 +570,6 @@ const buildWebsite = function (opts, command) {
             nomount: true,
             nounique: false,
             nocase: true,
-            //<-- uncomment this one for total failure to find any files >:-((
             nodir: true,
             nobrace: false,
             gitignore: true
@@ -577,7 +580,7 @@ const buildWebsite = function (opts, command) {
             }
 
             if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
-            let rv = {
+            const rv = {
               markdown: new Map(),
               html: new Map(),
               css: new Map(),
@@ -595,16 +598,16 @@ const buildWebsite = function (opts, command) {
               image: ['png', 'gif', 'jpg', 'jpeg', 'tiff', 'bmp', 'svg', 'psd', 'ai'],
               movie: ['mkv', 'mp4', 'avi', 'mov', 'flv']
             };
-            let rv_mapping = new Map();
+            const rv_mapping = new Map();
 
-            for (let n in rv_mapping_def) {
-              let a = rv_mapping_def[n];
+            for (const n in rv_mapping_def) {
+              const a = rv_mapping_def[n];
               if (DEBUG >= 4) console.log('key n', {
                 n,
                 a
               });
 
-              for (let b of a) {
+              for (const b of a) {
                 if (DEBUG >= 4) console.log('map n -> b', {
                   n,
                   b
@@ -616,20 +619,21 @@ const buildWebsite = function (opts, command) {
             if (DEBUG >= 3) console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
 
             for (const p of files || []) {
-              f = unixify(path.resolve(p));
+              const f = unixify(path.resolve(p));
               if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', {
                 'in': p,
                 out: f
               });
-              let fname = path.basename(f.toLowerCase());
-              let ext = path.extname(fname);
-              let el = {
+              const fname = path.basename(f.toLowerCase());
+              const ext = path.extname(fname);
+              const el = {
                 path: f,
                 nameLC: fname,
                 ext: ext,
-                relativePath: unixify(path.relative(config.docTreeBasedir, f))
+                relativePath: unixify(path.relative(config.docTreeBasedir, f)),
+                destinationRelPath: null
               };
-              let cat = rv_mapping.get(ext) || 'misc';
+              const cat = rv_mapping.get(ext) || 'misc';
               rv[cat].set(f, el);
 
               rv._.set(f, el);
@@ -648,7 +652,7 @@ const buildWebsite = function (opts, command) {
     DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
     console.log('DEBUG = ', DEBUG);
 
-    let paths = opts._.slice(command ? 1 : 0);
+    const paths = opts._.slice(command ? 1 : 0);
 
     const minPathsCount = 1;
 
@@ -676,12 +680,11 @@ const buildWebsite = function (opts, command) {
       let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
       scanPath = unixify(scanPath);
       if (DEBUG >= 1) console.log('scanPath:', scanPath);
-      let files = glob.sync(scanPath, {
+      const files = glob.sync(scanPath, {
         nosort: true,
         nomount: true,
         nounique: false,
         nocase: true,
-        //<-- uncomment this one for total failure to find any files >:-((
         nodir: true,
         nobrace: false,
         gitignore: true
@@ -749,8 +752,8 @@ const buildWebsite = function (opts, command) {
     config.destinationPath = outputDirPath;
     config.outputDirRelativePath = unixify(path.relative(config.docTreeBasedir, config.destinationPath));
     if (DEBUG >= 1) console.log('config:', config);
-    let scan = collectAllFiles();
-    let md = MarkDown({
+    const scan = collectAllFiles();
+    const md = MarkDown({
       // Enable HTML tags in source
       html: true,
       // Use '/' to close single tags (<br />).
@@ -783,9 +786,7 @@ const buildWebsite = function (opts, command) {
       // Highlighter function. Should return escaped HTML,
       // or '' if the source string is not changed and should be escaped externally.
       // If result starts with <pre... internal wrapper is skipped.
-      highlight: function ()
-      /*str, lang*/
-      {
+      highlight: function () {
         console.error('highligh callback invoked!');
         return '';
       } // Configure default attributes for given tags
@@ -807,7 +808,7 @@ const buildWebsite = function (opts, command) {
       },
       wikilinks: {
         postProcessPageName: function (pageName) {
-          let rv = myCustomPageNamePostprocessor(pageName);
+          const rv = myCustomPageNamePostprocessor(pageName);
           if (DEBUG >= 1) console.log('wikilink transform:', {
             'in': pageName,
             out: rv
@@ -844,31 +845,39 @@ const buildWebsite = function (opts, command) {
               }], [function () {
                 return 'js';
               }, function () {
-                const _temp = _forOf(allFiles[type], function (slot) {
-                  let key = slot[0];
-                  let entry = slot[1];
-                  entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-                  if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
-                  return Promise.resolve(loadFixedAssetTextFile(key, allFiles)).then(function (specRec2) {
-                    if (DEBUG >= 3) console.log('specRec:', specRec2);
-                    assert.strictEqual(specRec2, entry);
-                  });
-                });
+                {
+                  const collection = allFiles[type];
 
-                if (_temp && _temp.then) return _temp.then(function () {});
+                  const _temp = _forOf(collection, function (slot) {
+                    const key = slot[0];
+                    const entry = slot[1];
+                    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+                    if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+                    return Promise.resolve(loadFixedAssetTextFile(key, allFiles, collection)).then(function (specRec2) {
+                      if (DEBUG >= 3) console.log('specRec:', specRec2);
+                      assert.strictEqual(specRec2, entry);
+                    });
+                  });
+
+                  return _temp && _temp.then ? _temp.then(function () {}) : void 0;
+                }
               }, function () {}], [void 0, function () {
-                const _temp2 = _forOf(allFiles[type], function (slot) {
-                  let key = slot[0];
-                  let entry = slot[1];
-                  entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-                  if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
-                  return Promise.resolve(loadFixedAssetBinaryFile(key, allFiles)).then(function (specRec2) {
-                    if (DEBUG >= 3) console.log('specRec:', specRec2);
-                    assert.strictEqual(specRec2, entry);
-                  });
-                });
+                {
+                  const collection = allFiles[type];
 
-                if (_temp2 && _temp2.then) return _temp2.then(function () {});
+                  const _temp2 = _forOf(collection, function (slot) {
+                    const key = slot[0];
+                    const entry = slot[1];
+                    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+                    if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+                    return Promise.resolve(loadFixedAssetBinaryFile(key, allFiles, collection)).then(function (specRec2) {
+                      if (DEBUG >= 3) console.log('specRec:', specRec2);
+                      assert.strictEqual(specRec2, entry);
+                    });
+                  });
+
+                  return _temp2 && _temp2.then ? _temp2.then(function () {}) : void 0;
+                }
               }, function () {}]]);
 
               if (_temp3 && _temp3.then) return _temp3.then(function () {});
@@ -881,8 +890,8 @@ const buildWebsite = function (opts, command) {
           }
 
           const _temp6 = _forOf(allFiles.html, function (slot) {
-            let key = slot[0];
-            let entry = slot[1];
+            const key = slot[0];
+            const entry = slot[1];
             entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
             if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
             return Promise.resolve(loadHTML(key, allFiles)).then(function (specRec2) {
@@ -898,8 +907,8 @@ const buildWebsite = function (opts, command) {
         if (DEBUG >= 10) console.log('specRec:', specRec); // now process the other MD files too:
 
         const _temp8 = _forOf(allFiles.markdown, function (slot) {
-          let key = slot[0];
-          let entry = slot[1];
+          const key = slot[0];
+          const entry = slot[1];
           entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
           if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
           return Promise.resolve(compileMD(key, md, allFiles)).then(function (specRec2) {
@@ -911,6 +920,19 @@ const buildWebsite = function (opts, command) {
         return _temp8 && _temp8.then ? _temp8.then(_temp9) : _temp9(_temp8);
       });
     });
+  } catch (e) {
+    return Promise.reject(e);
+  }
+};
+
+const sanityCheck = function (opts, command) {
+  try {
+    console.log(`sanityCheck: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`);
+    DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
+    console.log('DEBUG = ', DEBUG);
+    return Promise.resolve(new Promise((resolve, reject) => {
+      resolve();
+    }));
   } catch (e) {
     return Promise.reject(e);
   }
@@ -946,10 +968,11 @@ const path = require('path');
 const fs = require('fs');
 
 let DEBUG = 1;
-let markdownTokens = {};
+const markdownTokens = {};
 const config = {
   docTreeBasedir: null,
-  destinationPath: null
+  destinationPath: null,
+  outputDirRelativePath: null
 };
 nomnom.script('deGaulle');
 nomnom.command('build').option('debug', {
@@ -979,11 +1002,9 @@ nomnom.command('sanity').option('debug', {
 }).option('outfile', {
   abbr: 'o',
   help: 'file to write results to'
-}).callback(function (opts
-/* , cmd */
-) {
+}).callback(function (opts, cmd) {
   try {
-    sanityCheck(opts);
+    sanityCheck(opts, cmd);
   } catch (ex) {
     console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
     process.exit(5);
@@ -1018,15 +1039,15 @@ function unixify(path) {
 }
 
 function absSrcPath(rel) {
-  let p = path.join(config.docTreeBasedir, rel);
+  const p = path.join(config.docTreeBasedir, rel);
   return unixify(path.resolve(p));
 }
 
 function readOptionalTxtConfigFile(rel) {
-  let p = absSrcPath(rel);
+  const p = absSrcPath(rel);
 
   if (fs.existsSync(p)) {
-    let src = fs.readFileSync(p, 'utf8'); // - split into lines
+    const src = fs.readFileSync(p, 'utf8'); // - split into lines
     // - filter out any lines whicch don't have an '='
     // - split each line across the initial '=' in there.
     // - turn this into a hash table?
@@ -1042,7 +1063,7 @@ function readOptionalTxtConfigFile(rel) {
       parts = parts.map(l => l.trim());
       return parts;
     });
-    let rv = {};
+    const rv = {};
     lines.forEach(l => {
       rv[l[0]] = l[1];
     });
@@ -1076,9 +1097,9 @@ function myCustomPageNamePostprocessor(spec) {
 }
 
 function cleanTokensForDisplay(tokens) {
-  let rv = [];
+  const rv = [];
 
-  for (let i in tokens) {
+  for (const i in tokens) {
     let t = tokens[i];
     t = cleanSingleTokenForDisplay(t);
 
@@ -1093,9 +1114,9 @@ function cleanTokensForDisplay(tokens) {
 }
 
 function cleanSingleTokenForDisplay(token) {
-  let rv = {};
+  const rv = {};
 
-  for (let attr in token) {
+  for (const attr in token) {
     if (token[attr] !== '' && token[attr] != null) {
       rv[attr] = token[attr];
     }
@@ -1108,7 +1129,7 @@ function traverseTokens(tokens, cb, depth) {
   depth = depth || 0;
 
   for (let i = 0, len = tokens.length; i < len; i++) {
-    let t = tokens[i];
+    const t = tokens[i];
     cb(t, i, tokens, depth);
 
     if (t.children) {

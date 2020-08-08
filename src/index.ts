@@ -23,11 +23,47 @@ let DEBUG = 1;
 
 const markdownTokens = {};
 
+interface ResultFileRecord {
+  path: string;
+  nameLC: string;
+  ext: string;
+  relativePath: string;
+  destinationRelPath: string;
+}
+interface ResultHtmlFileRecord extends ResultFileRecord {
+  HtmlContent: string;
+  HtmlHeadContent: string;
+  HtmlBody: any;
+  HtmlHead: any;
+}
+type ResultTextAssetFileRecord = ResultFileRecord
+type ResultBinaryAssetFileRecord = ResultFileRecord
+interface ResultsCollection {
+  markdown: Map<string, ResultHtmlFileRecord>;
+  html: Map<string, ResultHtmlFileRecord>;
+  css: Map<string, ResultTextAssetFileRecord>;
+  js: Map<string, ResultTextAssetFileRecord>;
+  image: Map<string, ResultBinaryAssetFileRecord>;
+  movie: Map<string, ResultBinaryAssetFileRecord>;
+  misc: Map<string, ResultBinaryAssetFileRecord>;
+  _: Map<string, ResultBinaryAssetFileRecord>;
+}
+interface ConfigRecord {
+  docTreeBasedir: string;
+  destinationPath: string;
+  outputDirRelativePath: string;
+}
 
-const config = {
+const config: ConfigRecord = {
   docTreeBasedir: null,
-  destinationPath: null
+  destinationPath: null,
+  outputDirRelativePath: null
 };
+
+type getIncludeRootDirFn = (options: any, state: any, startLine: number, endLine: number) => string;
+interface MarkdownItEnvironment {
+  getIncludeRootDir: getIncludeRootDirFn;
+}
 
 nomnom.script('deGaulle');
 
@@ -342,7 +378,7 @@ async function buildWebsite(opts, command) {
   //   relativePath --  relative path to config.docTreeBasedir
   // }
   //
-  async function collectAllFiles() {
+  async function collectAllFiles() : Promise<ResultsCollection> {
     let scanPath = path.join(config.docTreeBasedir, '**/*');
     scanPath = unixify(scanPath);
     if (DEBUG >= 1) console.log('scanPath:', scanPath);
@@ -364,7 +400,7 @@ async function buildWebsite(opts, command) {
 
         if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
-        const rv = {
+        const rv: ResultsCollection = {
           markdown: new Map(),
           html: new Map(),
           css: new Map(),
@@ -429,15 +465,16 @@ async function buildWebsite(opts, command) {
         if (DEBUG >= 3) console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
 
         for (const p of files || []) {
-          f = unixify(path.resolve(p));
+          const f = unixify(path.resolve(p));
           if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', { 'in': p, out: f });
           const fname = path.basename(f.toLowerCase());
           const ext = path.extname(fname);
-          const el = {
+          const el: ResultFileRecord = {
             path: f,
             nameLC: fname,
             ext: ext,
-            relativePath: unixify(path.relative(config.docTreeBasedir, f))
+            relativePath: unixify(path.relative(config.docTreeBasedir, f)),
+            destinationRelPath: null
           };
           const cat = rv_mapping.get(ext) || 'misc';
           rv[cat].set(f, el);
@@ -518,7 +555,7 @@ async function buildWebsite(opts, command) {
   });
 
 
-  const allFiles = await scan;
+  const allFiles: ResultsCollection = await scan;
   if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
 
   if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
@@ -569,30 +606,36 @@ async function buildWebsite(opts, command) {
 
     case 'css':
     case 'js':
-      for (const slot of allFiles[type]) {
-        const key = slot[0];
-        const entry = slot[1];
-        entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-        if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key = slot[0];
+          const entry = slot[1];
+          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
 
-        const specRec2 = await loadFixedAssetTextFile(key, allFiles);
+          const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
 
-        if (DEBUG >= 3) console.log('specRec:', specRec2);
-        assert.strictEqual(specRec2, entry);
+          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          assert.strictEqual(specRec2, entry);
+        }
       }
       continue;
 
     default:
-      for (const slot of allFiles[type]) {
-        const key = slot[0];
-        const entry = slot[1];
-        entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-        if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key = slot[0];
+          const entry = slot[1];
+          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
 
-        const specRec2 = await loadFixedAssetBinaryFile(key, allFiles);
+          const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
 
-        if (DEBUG >= 3) console.log('specRec:', specRec2);
-        assert.strictEqual(specRec2, entry);
+          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          assert.strictEqual(specRec2, entry);
+        }
       }
       continue;
     }
@@ -630,7 +673,9 @@ async function compileMD(mdPath, md, allFiles) {
           return;
         }
 
-        const env = {};
+        const env : MarkdownItEnvironment = {
+          getIncludeRootDir: null
+        };
 
         if (DEBUG >= 8)          console.log('source:\n', data);
 
@@ -749,19 +794,19 @@ async function loadHTML(htmlPath, allFiles) {
   });
 }
 
-async function loadFixedAssetTextFile(filePath, allFiles) {
+async function loadFixedAssetTextFile(filePath, allFiles, collection) {
   console.log(`processing file: ${filePath}...`);
 
   return new Promise((resolve, reject) => {
     fs.readFile(
-      htmlPath,
+      filePath,
       {
         encoding: 'utf8'
       },
       async (err, data) => {
         if (err) {
           reject(new Error(
-            `ERROR: read error ${err} for file ${htmlPath}`
+            `ERROR: read error ${err} for file ${filePath}`
           ));
           return;
         }
@@ -769,6 +814,7 @@ async function loadFixedAssetTextFile(filePath, allFiles) {
         if (DEBUG >= 1)          console.log('source:\n', data);
 
         // update the file record:
+        const el = collection.get(filePath);
         el.RawContent = data;
 
         resolve(el);
@@ -777,19 +823,19 @@ async function loadFixedAssetTextFile(filePath, allFiles) {
   });
 }
 
-async function loadFixedAssetBinaryFile(filePath, allFiles) {
+async function loadFixedAssetBinaryFile(filePath, allFiles, collection) {
   console.log(`processing file: ${filePath}...`);
 
   return new Promise((resolve, reject) => {
     fs.readFile(
-      htmlPath,
+      filePath,
       {
         encoding: 'utf8'
       },
       async (err, data) => {
         if (err) {
           reject(new Error(
-            `ERROR: read error ${err} for file ${htmlPath}`
+            `ERROR: read error ${err} for file ${filePath}`
           ));
           return;
         }
@@ -797,6 +843,7 @@ async function loadFixedAssetBinaryFile(filePath, allFiles) {
         if (DEBUG >= 1)          console.log('source:\n', data);
 
         // update the file record:
+        const el = collection.get(filePath);
 
         resolve(el);
       }
@@ -838,7 +885,7 @@ async function mdGenerated(pagePaths) {
   fs.writeFileSync(absDstPath('.nojekyll'), '');
 }
 
-function traverseTokens(tokens, cb, depth) {
+function traverseTokens(tokens, cb, depth?: number) {
   depth = depth || 0;
   for (let i = 0, len = tokens.length; i < len; i++) {
     const t = tokens[i];
