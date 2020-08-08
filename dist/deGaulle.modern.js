@@ -11,6 +11,12 @@ const mdPluginCollective = require('markdown-it-dirty-dozen');
 
 const pkg = require('../package.json');
 
+const jsdom = require('jsdom');
+
+const {
+  JSDOM
+} = jsdom;
+
 const glob = require('@gerhobbelt/glob');
 
 const gitignoreParser = require('@gerhobbelt/gitignore-parser');
@@ -22,6 +28,9 @@ const _ = require('lodash');
 const path = require('path');
 
 const fs = require('fs');
+
+let DEBUG = 1;
+let markdownTokens = {};
 const config = {
   docTreeBasedir: null,
   destinationPath: null
@@ -29,7 +38,7 @@ const config = {
 nomnom.script('deGaulle');
 nomnom.command('build').option('debug', {
   abbr: 'd',
-  flag: true,
+  flag: false,
   help: 'Print debugging info'
 }).option('config', {
   abbr: 'c',
@@ -45,7 +54,7 @@ nomnom.command('build').option('debug', {
 }).help('build website from sources');
 nomnom.command('sanity').option('debug', {
   abbr: 'd',
-  flag: true,
+  flag: false,
   help: 'Print debugging info'
 }).option('config', {
   abbr: 'c',
@@ -66,7 +75,7 @@ nomnom.command('sanity').option('debug', {
 }).help('run the sanity tests');
 nomnom.nocommand().option('debug', {
   abbr: 'd',
-  flag: true,
+  flag: false,
   help: 'Print debugging info'
 }).option('config', {
   abbr: 'c',
@@ -130,28 +139,30 @@ function readOptionalTxtConfigFile(rel) {
 function myCustomPageNamePostprocessor(spec) {
   // clean up unwanted characters
   spec = spec.replace(/ :: /g, '/');
-  spec = spec.replace(/ --+ /g, '/');
+  spec = spec.replace(/ --* /g, '/');
   spec = _.deburr(spec).trim(); // normalize case
 
   spec = spec.toLowerCase();
   spec = spec.replace(/[^\w\d\s\/_-]/g, '_');
   spec = spec.replace(/__+/g, '_');
   spec = spec.replace(/\s+/g, ' ');
-  console.log('myCustomPageNamePostprocessor STAGE 1', spec);
+  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 1', spec);
   spec = spec.replace(/_-_/g, '_');
   spec = spec.replace(/ - /g, ' ');
   spec = spec.replace(/[ _]* [ _]*/g, ' ');
-  console.log('myCustomPageNamePostprocessor STAGE 2', spec);
+  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 2', spec);
   spec = spec.replace(/(^|\/)[ _]+/g, '$1');
   spec = spec.replace(/[ _]+($|\/)/g, '$1');
-  console.log('myCustomPageNamePostprocessor STAGE 3', spec);
-  spec = spec.replace(/ /g, '.');
-  console.log('myCustomPageNamePostprocessor STAGE 4', spec);
+  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 3', spec);
+  spec = spec.replace(/ /g, '_');
+  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 4', spec);
   return spec;
 }
 
 async function buildWebsite(opts, command) {
   console.log(`buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`);
+  DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
+  console.log('DEBUG = ', DEBUG);
 
   let paths = opts._.slice(command ? 1 : 0);
 
@@ -167,8 +178,8 @@ async function buildWebsite(opts, command) {
     firstEntryPointPath = path.join(process.cwd(), firstEntryPointPath);
   }
 
-  firstEntryPointPath = path.normalize(firstEntryPointPath);
-  console.log('firstEntryPointPath = ', firstEntryPointPath);
+  firstEntryPointPath = unixify(path.normalize(firstEntryPointPath));
+  if (DEBUG >= 1) console.log('firstEntryPointPath = ', firstEntryPointPath);
   let entryStats = fs.lstatSync(firstEntryPointPath);
 
   if (entryStats && entryStats.isDirectory()) {
@@ -180,7 +191,7 @@ async function buildWebsite(opts, command) {
     let indexFilePriority = 0;
     let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
     scanPath = unixify(scanPath);
-    console.log('scanPath:', scanPath);
+    if (DEBUG >= 1) console.log('scanPath:', scanPath);
     let files = glob.sync(scanPath, {
       nosort: true,
       nomount: true,
@@ -191,7 +202,7 @@ async function buildWebsite(opts, command) {
       nobrace: false,
       gitignore: true
     });
-    console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+    if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
     for (const f of files || []) {
       switch (path.basename(f.toLowerCase())) {
@@ -226,7 +237,8 @@ async function buildWebsite(opts, command) {
     }
 
     if (indexFile) {
-      firstEntryPointPath = indexFile;
+      firstEntryPointPath = unixify(path.resolve(indexFile));
+      if (DEBUG >= 1) console.log('firstEntryPointPath', firstEntryPointPath);
       entryStats = fs.lstatSync(firstEntryPointPath);
     } else {
       throw new Error(`Could not find a default entry point file (index.md, index.html or README.md) in the entry point directory ${firstEntryPointPath} (${scanPath}`);
@@ -248,11 +260,11 @@ async function buildWebsite(opts, command) {
     outputDirPath = path.join(process.cwd(), outputDirPath);
   }
 
-  outputDirPath = path.normalize(outputDirPath);
-  console.log('outputDirPath = ', outputDirPath);
+  outputDirPath = unixify(path.normalize(outputDirPath));
+  if (DEBUG >= 1) console.log('outputDirPath = ', outputDirPath);
   config.destinationPath = outputDirPath;
   config.outputDirRelativePath = unixify(path.relative(config.docTreeBasedir, config.destinationPath));
-  console.log('config:', config); // now scan the entire tree: collect potential files for comparison & treatment
+  if (DEBUG >= 1) console.log('config:', config); // now scan the entire tree: collect potential files for comparison & treatment
   //
   // Produces an array of categories, which each are an array of file records,
   // where each file record has this format:
@@ -268,7 +280,7 @@ async function buildWebsite(opts, command) {
   async function collectAllFiles() {
     let scanPath = path.join(config.docTreeBasedir, '**/*');
     scanPath = unixify(scanPath);
-    console.log('scanPath:', scanPath);
+    if (DEBUG >= 1) console.log('scanPath:', scanPath);
     return new Promise((resolve, reject) => {
       glob(scanPath, {
         nosort: true,
@@ -285,7 +297,7 @@ async function buildWebsite(opts, command) {
           return;
         }
 
-        console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+        if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
         let rv = {
           markdown: new Map(),
           html: new Map(),
@@ -308,13 +320,13 @@ async function buildWebsite(opts, command) {
 
         for (let n in rv_mapping_def) {
           let a = rv_mapping_def[n];
-          console.log('key n', {
+          if (DEBUG >= 4) console.log('key n', {
             n,
             a
           });
 
           for (let b of a) {
-            console.log('map n -> b', {
+            if (DEBUG >= 4) console.log('map n -> b', {
               n,
               b
             });
@@ -322,9 +334,14 @@ async function buildWebsite(opts, command) {
           }
         }
 
-        console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
+        if (DEBUG >= 3) console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
 
-        for (const f of files || []) {
+        for (const p of files || []) {
+          f = unixify(path.resolve(p));
+          if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', {
+            'in': p,
+            out: f
+          });
           let fname = path.basename(f.toLowerCase());
           let ext = path.extname(fname);
           let el = {
@@ -390,7 +407,7 @@ async function buildWebsite(opts, command) {
   }); // augment the md instance for use with the markdown_it_include plugin:
   //md.getIncludeRootDir = ...
 
-  console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
+  if (DEBUG >= 1) console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
   mdPluginCollective.use_dirty_dozen(md, {
     abbr: {
       abbreviations: readOptionalTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
@@ -402,10 +419,18 @@ async function buildWebsite(opts, command) {
       getRootDir: (options, state, startLine, endLine) => state.env.getIncludeRootDir(options, state, startLine, endLine)
     },
     wikilinks: {
-      postProcessPageName: myCustomPageNamePostprocessor
+      postProcessPageName: function (pageName) {
+        let rv = myCustomPageNamePostprocessor(pageName);
+        if (DEBUG >= 1) console.log('wikilink transform:', {
+          'in': pageName,
+          out: rv
+        });
+        return rv;
+      }
     }
   });
   let allFiles = await scan;
+  if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
 
   if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
     throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
@@ -413,16 +438,16 @@ async function buildWebsite(opts, command) {
 
   console.log(`processing root file: ${firstEntryPointPath}...`);
   let specRec = await compileMD(firstEntryPointPath, md, allFiles);
+  if (DEBUG >= 10) console.log('specRec:', specRec); // now process the other MD files too:
 
   for (let slot of allFiles.markdown) {
     let key = slot[0];
     let entry = slot[1];
     entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-
-    if (!entry.HtmlContent) {
-      let specRec2 = await compileMD(key, md, allFiles);
-      assert.strictEqual(specRec2, entry);
-    }
+    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
+    let specRec2 = await compileMD(key, md, allFiles);
+    if (DEBUG >= 3) console.log('specRec:', specRec2);
+    assert.strictEqual(specRec2, entry);
   } // now process the HTML files:
 
 
@@ -430,14 +455,54 @@ async function buildWebsite(opts, command) {
     let key = slot[0];
     let entry = slot[1];
     entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
+    let specRec2 = await loadHTML(key, allFiles);
+    if (DEBUG >= 3) console.log('specRec:', specRec2);
+    assert.strictEqual(specRec2, entry);
+  } // now process the CSS, JS and other 'fixed assets' files:
+  //
+  // [css, js, image, movie, misc, _]
 
-    if (!entry.HtmlContent) {
-      let specRec2 = await loadHTML(key, allFiles);
-      assert.strictEqual(specRec2, entry);
+
+  for (let type in allFiles) {
+    switch (type) {
+      case 'html':
+      case 'markdown':
+        continue;
+
+      case 'css':
+      case 'js':
+        for (let slot of allFiles[type]) {
+          let key = slot[0];
+          let entry = slot[1];
+          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+          let specRec2 = await loadFixedAssetTextFile(key);
+          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          assert.strictEqual(specRec2, entry);
+        }
+
+        continue;
+
+      default:
+        for (let slot of allFiles[type]) {
+          let key = slot[0];
+          let entry = slot[1];
+          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+          let specRec2 = await loadFixedAssetBinaryFile(key);
+          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          assert.strictEqual(specRec2, entry);
+        }
+
+        continue;
     }
   } // now's the time to match the links in the generated content and do some linkage reporting alongside:
   //
 
+
+  if (DEBUG >= 1) console.log('>>>>>>>>>>>>>>>>>>>> allFiles:', allFiles);
+  if (DEBUG >= 1) console.log('markdown AST token types:', Object.keys(markdownTokens).sort());
 }
 
 async function compileMD(mdPath, md, allFiles) {
@@ -452,8 +517,12 @@ async function compileMD(mdPath, md, allFiles) {
       }
 
       let env = {};
+      if (DEBUG >= 8) console.log('source:\n', data); // augment the md instance for use with the markdown_it_include plugin:
 
       env.getIncludeRootDir = function (options, state, startLine, endLine) {
+        if (DEBUG >= 6) console.log('##### include root dir is today:', {
+          dir: path.dirname(mdPath)
+        });
         return path.dirname(mdPath);
       }; // let content = md.render(data); --> .parse + .renderer.render
       //
@@ -463,18 +532,40 @@ async function compileMD(mdPath, md, allFiles) {
 
       let state = new md.core.State(data, md, env);
       md.core.process(state);
-      let tokens = state.tokens; //console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
-
+      let tokens = state.tokens;
+      if (DEBUG >= 10) console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
       let typeMap = new Set();
       traverseTokens(tokens, (t, idx, arr, depth) => {
         typeMap.add(t.type);
+        markdownTokens[t.type] = true;
       });
-      console.log('token types:', typeMap);
+      if (DEBUG >= 4) console.log('token types:', typeMap);
 
       let content = md.renderer.render(tokens, md.options, env);
+      if (DEBUG >= 4) console.log('output:\n', content);
+      const dom = new JSDOM('<html><head>\n' + content, {
+        includeNodeLocations: true
+      });
+      const document = dom.window.document;
+      const bodyEl = document.body; // implicitly created
+
+      const headEl = document.querySelector('head');
+      if (DEBUG >= 1) console.log('MARKDOWN:\n', {
+        html: document,
+        body: bodyEl.innerHTML,
+        head: headEl.innerHTML
+      }); // update the file record:
 
       let el = allFiles.markdown.get(mdPath);
-      el.HtmlContent = content;
+      if (DEBUG >= 3) console.log('update the file record:', {
+        mdPath,
+        el
+      });
+      el.HtmlContent = content; //el.HtmlContent = bodyEl.innerHTML;
+
+      el.HtmlHeadContent = headEl.innerHTML;
+      el.HtmlBody = bodyEl;
+      el.HtmlHead = headEl;
       resolve(el);
     });
   });
@@ -491,12 +582,95 @@ async function loadHTML(htmlPath, allFiles) {
         return;
       }
 
+      if (DEBUG >= 1) console.log('source:\n', data);
+      const dom = new JSDOM(data, {
+        includeNodeLocations: true
+      });
+      const document = dom.window.document;
+      const bodyEl = document.body; // implicitly created
+
+      const headEl = document.querySelector('head');
+      if (DEBUG >= 1) console.log('HTML:\n', {
+        html: document,
+        body: bodyEl.innerHTML,
+        head: headEl.innerHTML
+      }); // update the file record:
+
       let el = allFiles.html.get(htmlPath);
-      el.HtmlContent = data;
+      el.HtmlContent = bodyEl.innerHTML;
+      el.HtmlHeadContent = headEl.innerHTML;
+      el.HtmlBody = bodyEl;
+      el.HtmlHead = headEl;
       resolve(el);
     });
   });
 }
+
+async function loadFixedAssetTextFile(filePath, allFiles) {
+  console.log(`processing file: ${filePath}...`);
+  return new Promise((resolve, reject) => {
+    fs.readFile(htmlPath, {
+      encoding: 'utf8'
+    }, async (err, data) => {
+      if (err) {
+        reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+        return;
+      }
+
+      if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
+
+      el.RawContent = data;
+      resolve(el);
+    });
+  });
+}
+
+async function loadFixedAssetBinaryFile(filePath, allFiles) {
+  console.log(`processing file: ${filePath}...`);
+  return new Promise((resolve, reject) => {
+    fs.readFile(htmlPath, {
+      encoding: 'utf8'
+    }, async (err, data) => {
+      if (err) {
+        reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+        return;
+      }
+
+      if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
+
+      resolve(el);
+    });
+  });
+}
+
+function cleanTokensForDisplay(tokens) {
+  let rv = [];
+
+  for (let i in tokens) {
+    let t = tokens[i];
+    t = cleanSingleTokenForDisplay(t);
+
+    if (t.children) {
+      t.children = cleanTokensForDisplay(t.children);
+    }
+
+    rv[i] = t;
+  }
+
+  return rv;
+}
+
+function cleanSingleTokenForDisplay(token) {
+  let rv = {};
+
+  for (let attr in token) {
+    if (token[attr] !== '' && token[attr] != null) {
+      rv[attr] = token[attr];
+    }
+  }
+
+  return rv;
+} // https://vuepress.vuejs.org/plugin/life-cycle.html#generated
 
 function traverseTokens(tokens, cb, depth) {
   depth = depth || 0;

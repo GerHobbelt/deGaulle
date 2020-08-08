@@ -195,6 +195,210 @@
     }, check);
   }
 
+  const loadFixedAssetBinaryFile = function (filePath, allFiles) {
+    try {
+      console.log(`processing file: ${filePath}...`);
+      return Promise.resolve(new Promise((resolve, reject) => {
+        fs.readFile(htmlPath, {
+          encoding: 'utf8'
+        }, function (err, data) {
+          try {
+            if (err) {
+              reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+              return Promise.resolve();
+            }
+
+            if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
+
+            resolve(el);
+            return Promise.resolve();
+          } catch (e) {
+            return Promise.reject(e);
+          }
+        });
+      }));
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  };
+
+  function _switch(discriminant, cases) {
+    var dispatchIndex = -1;
+    var awaitBody;
+
+    outer: {
+      for (var i = 0; i < cases.length; i++) {
+        var test = cases[i][0];
+
+        if (test) {
+          var testValue = test();
+
+          if (testValue && testValue.then) {
+            break outer;
+          }
+
+          if (testValue === discriminant) {
+            dispatchIndex = i;
+            break;
+          }
+        } else {
+          // Found the default case, set it as the pending dispatch case
+          dispatchIndex = i;
+        }
+      }
+
+      if (dispatchIndex !== -1) {
+        do {
+          var body = cases[dispatchIndex][1];
+
+          while (!body) {
+            dispatchIndex++;
+            body = cases[dispatchIndex][1];
+          }
+
+          var result = body();
+
+          if (result && result.then) {
+            awaitBody = true;
+            break outer;
+          }
+
+          var fallthroughCheck = cases[dispatchIndex][2];
+          dispatchIndex++;
+        } while (fallthroughCheck && !fallthroughCheck());
+
+        return result;
+      }
+    }
+
+    const pact = new _Pact();
+
+    const reject = _settle.bind(null, pact, 2);
+
+    (awaitBody ? result.then(_resumeAfterBody) : testValue.then(_resumeAfterTest)).then(void 0, reject);
+    return pact;
+
+    function _resumeAfterTest(value) {
+      for (;;) {
+        if (value === discriminant) {
+          dispatchIndex = i;
+          break;
+        }
+
+        if (++i === cases.length) {
+          if (dispatchIndex !== -1) {
+            break;
+          } else {
+            _settle(pact, 1, result);
+
+            return;
+          }
+        }
+
+        test = cases[i][0];
+
+        if (test) {
+          value = test();
+
+          if (value && value.then) {
+            value.then(_resumeAfterTest).then(void 0, reject);
+            return;
+          }
+        } else {
+          dispatchIndex = i;
+        }
+      }
+
+      do {
+        var body = cases[dispatchIndex][1];
+
+        while (!body) {
+          dispatchIndex++;
+          body = cases[dispatchIndex][1];
+        }
+
+        var result = body();
+
+        if (result && result.then) {
+          result.then(_resumeAfterBody).then(void 0, reject);
+          return;
+        }
+
+        var fallthroughCheck = cases[dispatchIndex][2];
+        dispatchIndex++;
+      } while (fallthroughCheck && !fallthroughCheck());
+
+      _settle(pact, 1, result);
+    }
+
+    function _resumeAfterBody(result) {
+      for (;;) {
+        var fallthroughCheck = cases[dispatchIndex][2];
+
+        if (!fallthroughCheck || fallthroughCheck()) {
+          break;
+        }
+
+        dispatchIndex++;
+        var body = cases[dispatchIndex][1];
+
+        while (!body) {
+          dispatchIndex++;
+          body = cases[dispatchIndex][1];
+        }
+
+        result = body();
+
+        if (result && result.then) {
+          result.then(_resumeAfterBody).then(void 0, reject);
+          return;
+        }
+      }
+
+      _settle(pact, 1, result);
+    }
+  }
+
+  const loadFixedAssetTextFile = function (filePath, allFiles) {
+    try {
+      console.log(`processing file: ${filePath}...`);
+      return Promise.resolve(new Promise((resolve, reject) => {
+        fs.readFile(htmlPath, {
+          encoding: 'utf8'
+        }, function (err, data) {
+          try {
+            if (err) {
+              reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
+              return Promise.resolve();
+            }
+
+            if (DEBUG >= 1) console.log('source:\n', data); // update the file record:
+
+            el.RawContent = data;
+            resolve(el);
+            return Promise.resolve();
+          } catch (e) {
+            return Promise.reject(e);
+          }
+        });
+      }));
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  };
+
+  function _forIn(target, body, check) {
+    var keys = [];
+
+    for (var key in target) {
+      keys.push(key);
+    }
+
+    return _forTo(keys, function (i) {
+      return body(keys[i]);
+    }, check);
+  }
+
   const loadHTML = function (htmlPath, allFiles) {
     try {
       console.log(`processing file: ${htmlPath}...`);
@@ -208,10 +412,25 @@
               return Promise.resolve();
             }
 
-            if (DEBUG) console.log('source:\n', data); // update the file record:
+            if (DEBUG >= 1) console.log('source:\n', data);
+            const dom = new JSDOM(data, {
+              includeNodeLocations: true
+            });
+            const document = dom.window.document;
+            const bodyEl = document.body; // implicitly created
+
+            const headEl = document.querySelector('head');
+            if (DEBUG >= 1) console.log('HTML:\n', {
+              html: document,
+              body: bodyEl.innerHTML,
+              head: headEl.innerHTML
+            }); // update the file record:
 
             let el = allFiles.html.get(htmlPath);
-            el.HtmlContent = data;
+            el.HtmlContent = bodyEl.innerHTML;
+            el.HtmlHeadContent = headEl.innerHTML;
+            el.HtmlBody = bodyEl;
+            el.HtmlHead = headEl;
             resolve(el);
             return Promise.resolve();
           } catch (e) {
@@ -238,10 +457,10 @@
             }
 
             let env = {};
-            if (DEBUG) console.log('source:\n', data); // augment the md instance for use with the markdown_it_include plugin:
+            if (DEBUG >= 8) console.log('source:\n', data); // augment the md instance for use with the markdown_it_include plugin:
 
             env.getIncludeRootDir = function (options, state, startLine, endLine) {
-              if (DEBUG) console.log('##### include root dir is today:', {
+              if (DEBUG >= 6) console.log('##### include root dir is today:', {
                 dir: path.dirname(mdPath)
               });
               return path.dirname(mdPath);
@@ -253,13 +472,14 @@
 
             let state = new md.core.State(data, md, env);
             md.core.process(state);
-            let tokens = state.tokens; //console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
-
+            let tokens = state.tokens;
+            if (DEBUG >= 10) console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
             let typeMap = new Set();
             traverseTokens(tokens, (t, idx, arr, depth) => {
               typeMap.add(t.type);
+              markdownTokens[t.type] = true;
             });
-            console.log('token types:', typeMap);
+            if (DEBUG >= 4) console.log('token types:', typeMap);
 
             if (0) {
               let position = 0;
@@ -290,10 +510,30 @@
             }
 
             let content = md.renderer.render(tokens, md.options, env);
-            if (DEBUG) console.log('output:\n', content); // update the file record:
+            if (DEBUG >= 4) console.log('output:\n', content);
+            const dom = new JSDOM('<html><head>\n' + content, {
+              includeNodeLocations: true
+            });
+            const document = dom.window.document;
+            const bodyEl = document.body; // implicitly created
+
+            const headEl = document.querySelector('head');
+            if (DEBUG >= 1) console.log('MARKDOWN:\n', {
+              html: document,
+              body: bodyEl.innerHTML,
+              head: headEl.innerHTML
+            }); // update the file record:
 
             let el = allFiles.markdown.get(mdPath);
-            el.HtmlContent = content;
+            if (DEBUG >= 3) console.log('update the file record:', {
+              mdPath,
+              el
+            });
+            el.HtmlContent = content; //el.HtmlContent = bodyEl.innerHTML;
+
+            el.HtmlHeadContent = headEl.innerHTML;
+            el.HtmlBody = bodyEl;
+            el.HtmlHead = headEl;
             resolve(el);
             return Promise.resolve();
           } catch (e) {
@@ -324,7 +564,7 @@
         try {
           let scanPath = path.join(config.docTreeBasedir, '**/*');
           scanPath = unixify(scanPath);
-          console.log('scanPath:', scanPath);
+          if (DEBUG >= 1) console.log('scanPath:', scanPath);
           return Promise.resolve(new Promise((resolve, reject) => {
             glob(scanPath, {
               nosort: true,
@@ -341,7 +581,7 @@
                 return;
               }
 
-              console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+              if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
               let rv = {
                 markdown: new Map(),
                 html: new Map(),
@@ -364,13 +604,13 @@
 
               for (let n in rv_mapping_def) {
                 let a = rv_mapping_def[n];
-                console.log('key n', {
+                if (DEBUG >= 4) console.log('key n', {
                   n,
                   a
                 });
 
                 for (let b of a) {
-                  console.log('map n -> b', {
+                  if (DEBUG >= 4) console.log('map n -> b', {
                     n,
                     b
                   });
@@ -378,9 +618,14 @@
                 }
               }
 
-              console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
+              if (DEBUG >= 3) console.log('######################### mapping ##########################\n', rv_mapping, '\n###########################################');
 
-              for (const f of files || []) {
+              for (const p of files || []) {
+                f = unixify(path.resolve(p));
+                if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', {
+                  'in': p,
+                  out: f
+                });
                 let fname = path.basename(f.toLowerCase());
                 let ext = path.extname(fname);
                 let el = {
@@ -405,6 +650,8 @@
 
 
       console.log(`buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`);
+      DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
+      console.log('DEBUG = ', DEBUG);
 
       let paths = opts._.slice(command ? 1 : 0);
 
@@ -420,8 +667,8 @@
         firstEntryPointPath = path.join(process.cwd(), firstEntryPointPath);
       }
 
-      firstEntryPointPath = path.normalize(firstEntryPointPath);
-      console.log('firstEntryPointPath = ', firstEntryPointPath);
+      firstEntryPointPath = unixify(path.normalize(firstEntryPointPath));
+      if (DEBUG >= 1) console.log('firstEntryPointPath = ', firstEntryPointPath);
       let entryStats = fs.lstatSync(firstEntryPointPath);
 
       if (entryStats && entryStats.isDirectory()) {
@@ -433,7 +680,7 @@
         let indexFilePriority = 0;
         let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
         scanPath = unixify(scanPath);
-        console.log('scanPath:', scanPath);
+        if (DEBUG >= 1) console.log('scanPath:', scanPath);
         let files = glob.sync(scanPath, {
           nosort: true,
           nomount: true,
@@ -444,7 +691,7 @@
           nobrace: false,
           gitignore: true
         });
-        console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+        if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
         for (const f of files || []) {
           switch (path.basename(f.toLowerCase())) {
@@ -479,7 +726,8 @@
         }
 
         if (indexFile) {
-          firstEntryPointPath = indexFile;
+          firstEntryPointPath = unixify(path.resolve(indexFile));
+          if (DEBUG >= 1) console.log('firstEntryPointPath', firstEntryPointPath);
           entryStats = fs.lstatSync(firstEntryPointPath);
         } else {
           throw new Error(`Could not find a default entry point file (index.md, index.html or README.md) in the entry point directory ${firstEntryPointPath} (${scanPath}`);
@@ -501,11 +749,11 @@
         outputDirPath = path.join(process.cwd(), outputDirPath);
       }
 
-      outputDirPath = path.normalize(outputDirPath);
-      console.log('outputDirPath = ', outputDirPath);
+      outputDirPath = unixify(path.normalize(outputDirPath));
+      if (DEBUG >= 1) console.log('outputDirPath = ', outputDirPath);
       config.destinationPath = outputDirPath;
       config.outputDirRelativePath = unixify(path.relative(config.docTreeBasedir, config.destinationPath));
-      console.log('config:', config);
+      if (DEBUG >= 1) console.log('config:', config);
       let scan = collectAllFiles();
       let md = MarkDown({
         // Enable HTML tags in source
@@ -551,7 +799,7 @@
       }); // augment the md instance for use with the markdown_it_include plugin:
       //md.getIncludeRootDir = ...
 
-      console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
+      if (DEBUG >= 1) console.log('setting up markdown-it:', mdPluginCollective, typeof mdPluginCollective.use_dirty_dozen);
       mdPluginCollective.use_dirty_dozen(md, {
         abbr: {
           abbreviations: readOptionalTxtConfigFile('.deGaulle/abbr-abbreviations.txt'),
@@ -563,11 +811,18 @@
           getRootDir: (options, state, startLine, endLine) => state.env.getIncludeRootDir(options, state, startLine, endLine)
         },
         wikilinks: {
-          postProcessPageName: myCustomPageNamePostprocessor
+          postProcessPageName: function (pageName) {
+            let rv = myCustomPageNamePostprocessor(pageName);
+            if (DEBUG >= 1) console.log('wikilink transform:', {
+              'in': pageName,
+              out: rv
+            });
+            return rv;
+          }
         }
       });
       return Promise.resolve(scan).then(function (allFiles) {
-        if (DEBUG) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
+        if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
 
         if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
           throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
@@ -575,49 +830,90 @@
 
         console.log(`processing root file: ${firstEntryPointPath}...`);
         return Promise.resolve(compileMD(firstEntryPointPath, md, allFiles)).then(function (specRec) {
-          function _temp4() {
-            // now process the HTML files:
-            return _forOf(allFiles.html, function (slot) {
+          function _temp9() {
+            function _temp7() {
+              function _temp5() {
+                // now's the time to match the links in the generated content and do some linkage reporting alongside:
+                //
+                if (DEBUG >= 1) console.log('>>>>>>>>>>>>>>>>>>>> allFiles:', allFiles);
+                if (DEBUG >= 1) console.log('markdown AST token types:', Object.keys(markdownTokens).sort());
+              }
+
+              const _temp4 = _forIn(allFiles, function (type) {
+                const _temp3 = _switch(type, [[function () {
+                  return 'html';
+                }], [function () {
+                  return 'markdown';
+                }], [function () {
+                  return 'css';
+                }], [function () {
+                  return 'js';
+                }, function () {
+                  const _temp = _forOf(allFiles[type], function (slot) {
+                    let key = slot[0];
+                    let entry = slot[1];
+                    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+                    if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+                    return Promise.resolve(loadFixedAssetTextFile(key, allFiles)).then(function (specRec2) {
+                      if (DEBUG >= 3) console.log('specRec:', specRec2);
+                      assert.strictEqual(specRec2, entry);
+                    });
+                  });
+
+                  if (_temp && _temp.then) return _temp.then(function () {});
+                }, function () {}], [void 0, function () {
+                  const _temp2 = _forOf(allFiles[type], function (slot) {
+                    let key = slot[0];
+                    let entry = slot[1];
+                    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
+                    if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+                    return Promise.resolve(loadFixedAssetBinaryFile(key, allFiles)).then(function (specRec2) {
+                      if (DEBUG >= 3) console.log('specRec:', specRec2);
+                      assert.strictEqual(specRec2, entry);
+                    });
+                  });
+
+                  if (_temp2 && _temp2.then) return _temp2.then(function () {});
+                }, function () {}]]);
+
+                if (_temp3 && _temp3.then) return _temp3.then(function () {});
+              });
+
+              // now process the CSS, JS and other 'fixed assets' files:
+              //
+              // [css, js, image, movie, misc, _]
+              return _temp4 && _temp4.then ? _temp4.then(_temp5) : _temp5(_temp4);
+            }
+
+            const _temp6 = _forOf(allFiles.html, function (slot) {
               let key = slot[0];
               let entry = slot[1];
               entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-              if (DEBUG) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
+              if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
+              return Promise.resolve(loadHTML(key, allFiles)).then(function (specRec2) {
+                if (DEBUG >= 3) console.log('specRec:', specRec2);
+                assert.strictEqual(specRec2, entry);
+              });
+            });
 
-              const _temp2 = function () {
-                if (!entry.HtmlContent) {
-                  return Promise.resolve(loadHTML(key, allFiles)).then(function (specRec2) {
-                    if (DEBUG) console.log('specRec:', specRec2);
-                    assert.strictEqual(specRec2, entry);
-                  });
-                }
-              }();
-
-              if (_temp2 && _temp2.then) return _temp2.then(function () {});
-            }); // now's the time to match the links in the generated content and do some linkage reporting alongside:
-            //
+            // now process the HTML files:
+            return _temp6 && _temp6.then ? _temp6.then(_temp7) : _temp7(_temp6);
           }
 
-          if (DEBUG) console.log('specRec:', specRec); // now process the other MD files too:
+          if (DEBUG >= 10) console.log('specRec:', specRec); // now process the other MD files too:
 
-          const _temp3 = _forOf(allFiles.markdown, function (slot) {
+          const _temp8 = _forOf(allFiles.markdown, function (slot) {
             let key = slot[0];
             let entry = slot[1];
             entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-            if (DEBUG) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
-
-            const _temp = function () {
-              if (!entry.HtmlContent) {
-                return Promise.resolve(compileMD(key, md, allFiles)).then(function (specRec2) {
-                  if (DEBUG) console.log('specRec:', specRec2);
-                  assert.strictEqual(specRec2, entry);
-                });
-              }
-            }();
-
-            if (_temp && _temp.then) return _temp.then(function () {});
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
+            return Promise.resolve(compileMD(key, md, allFiles)).then(function (specRec2) {
+              if (DEBUG >= 3) console.log('specRec:', specRec2);
+              assert.strictEqual(specRec2, entry);
+            });
           });
 
-          return _temp3 && _temp3.then ? _temp3.then(_temp4) : _temp4(_temp3);
+          return _temp8 && _temp8.then ? _temp8.then(_temp9) : _temp9(_temp8);
         });
       });
     } catch (e) {
@@ -636,6 +932,12 @@
 
   const pkg = require('../package.json');
 
+  const jsdom = require('jsdom');
+
+  const {
+    JSDOM
+  } = jsdom;
+
   const glob = require('@gerhobbelt/glob');
 
   const gitignoreParser = require('@gerhobbelt/gitignore-parser');
@@ -648,7 +950,8 @@
 
   const fs = require('fs');
 
-  const DEBUG = false;
+  let DEBUG = 1;
+  let markdownTokens = {};
   const config = {
     docTreeBasedir: null,
     destinationPath: null
@@ -656,7 +959,7 @@
   nomnom.script('deGaulle');
   nomnom.command('build').option('debug', {
     abbr: 'd',
-    flag: true,
+    flag: false,
     help: 'Print debugging info'
   }).option('config', {
     abbr: 'c',
@@ -672,7 +975,7 @@
   }).help('build website from sources');
   nomnom.command('sanity').option('debug', {
     abbr: 'd',
-    flag: true,
+    flag: false,
     help: 'Print debugging info'
   }).option('config', {
     abbr: 'c',
@@ -693,7 +996,7 @@
   }).help('run the sanity tests');
   nomnom.nocommand().option('debug', {
     abbr: 'd',
-    flag: true,
+    flag: false,
     help: 'Print debugging info'
   }).option('config', {
     abbr: 'c',
@@ -757,24 +1060,53 @@
   function myCustomPageNamePostprocessor(spec) {
     // clean up unwanted characters
     spec = spec.replace(/ :: /g, '/');
-    spec = spec.replace(/ --+ /g, '/');
+    spec = spec.replace(/ --* /g, '/');
     spec = _.deburr(spec).trim(); // normalize case
 
     spec = spec.toLowerCase();
     spec = spec.replace(/[^\w\d\s\/_-]/g, '_');
     spec = spec.replace(/__+/g, '_');
     spec = spec.replace(/\s+/g, ' ');
-    console.log('myCustomPageNamePostprocessor STAGE 1', spec);
+    if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 1', spec);
     spec = spec.replace(/_-_/g, '_');
     spec = spec.replace(/ - /g, ' ');
     spec = spec.replace(/[ _]* [ _]*/g, ' ');
-    console.log('myCustomPageNamePostprocessor STAGE 2', spec);
+    if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 2', spec);
     spec = spec.replace(/(^|\/)[ _]+/g, '$1');
     spec = spec.replace(/[ _]+($|\/)/g, '$1');
-    console.log('myCustomPageNamePostprocessor STAGE 3', spec);
-    spec = spec.replace(/ /g, '.');
-    console.log('myCustomPageNamePostprocessor STAGE 4', spec);
+    if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 3', spec);
+    spec = spec.replace(/ /g, '_');
+    if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 4', spec);
     return spec;
+  }
+
+  function cleanTokensForDisplay(tokens) {
+    let rv = [];
+
+    for (let i in tokens) {
+      let t = tokens[i];
+      t = cleanSingleTokenForDisplay(t);
+
+      if (t.children) {
+        t.children = cleanTokensForDisplay(t.children);
+      }
+
+      rv[i] = t;
+    }
+
+    return rv;
+  }
+
+  function cleanSingleTokenForDisplay(token) {
+    let rv = {};
+
+    for (let attr in token) {
+      if (token[attr] !== '' && token[attr] != null) {
+        rv[attr] = token[attr];
+      }
+    }
+
+    return rv;
   }
 
   function traverseTokens(tokens, cb, depth) {

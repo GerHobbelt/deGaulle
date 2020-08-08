@@ -203,10 +203,10 @@ async function buildWebsite(opts, command) {
       2
     )}`
   );
-  
+
   DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
-  console.log("DEBUG = ", DEBUG);
-  
+  console.log('DEBUG = ', DEBUG);
+
   let paths = opts._.slice(command ? 1 : 0);
   const minPathsCount = 1;
 
@@ -281,7 +281,7 @@ async function buildWebsite(opts, command) {
 
     if (indexFile) {
       firstEntryPointPath = unixify(path.resolve(indexFile));
-      if (DEBUG >= 1) console.log("firstEntryPointPath", firstEntryPointPath);
+      if (DEBUG >= 1) console.log('firstEntryPointPath', firstEntryPointPath);
       entryStats = fs.lstatSync(firstEntryPointPath);
     } else {
       throw new Error(
@@ -415,7 +415,7 @@ async function buildWebsite(opts, command) {
 
         for (const p of files || []) {
           f = unixify(path.resolve(p));
-          if (DEBUG >= 9) console.log("hacky fix for glob output not being abs path on Windows:", { in: p, out: f })
+          if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', { 'in': p, out: f });
           let fname = path.basename(f.toLowerCase());
           let ext = path.extname(fname);
           let el = {
@@ -496,7 +496,7 @@ async function buildWebsite(opts, command) {
     wikilinks: {
       postProcessPageName: function (pageName) {
         let rv = myCustomPageNamePostprocessor(pageName);
-        if (DEBUG >= 1) console.log("wikilink transform:", { in: pageName, out: rv });
+        if (DEBUG >= 1) console.log('wikilink transform:', { 'in': pageName, out: rv });
         return rv;
       }
     }
@@ -544,7 +544,7 @@ async function buildWebsite(opts, command) {
   }
 
   // now process the CSS, JS and other 'fixed assets' files:
-  // 
+  //
   // [css, js, image, movie, misc, _]
   for (let type in allFiles) {
     switch (type) {
@@ -590,9 +590,9 @@ async function buildWebsite(opts, command) {
 
 
 
-  
 
-  
+
+
 
 }
 
@@ -670,15 +670,15 @@ async function compileMD(mdPath, md, allFiles) {
         const dom = new JSDOM('<html><head>\n' + content,
           { includeNodeLocations: true }
         );
-         
+
         const document = dom.window.document;
         const bodyEl = document.body; // implicitly created
-        const headEl = document.querySelector("head");
+        const headEl = document.querySelector('head');
         if (DEBUG >= 1)          console.log('MARKDOWN:\n', { html: document, body: bodyEl.innerHTML, head: headEl.innerHTML });
 
         // update the file record:
         let el = allFiles.markdown.get(mdPath);
-        if (DEBUG >= 3) console.log("update the file record:", { mdPath, el })
+        if (DEBUG >= 3) console.log('update the file record:', { mdPath, el });
         el.HtmlContent = content;
         //el.HtmlContent = bodyEl.innerHTML;
         el.HtmlHeadContent = headEl.innerHTML;
@@ -715,10 +715,10 @@ async function loadHTML(htmlPath, allFiles) {
         const dom = new JSDOM(data,
           { includeNodeLocations: true }
         );
-         
+
         const document = dom.window.document;
         const bodyEl = document.body; // implicitly created
-        const headEl = document.querySelector("head");
+        const headEl = document.querySelector('head');
         if (DEBUG >= 1)          console.log('HTML:\n', { html: document, body: bodyEl.innerHTML, head: headEl.innerHTML });
 
         // update the file record:
