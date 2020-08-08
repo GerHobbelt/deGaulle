@@ -153,4 +153,5 @@ typings/
 #!.vscode/launch.json
 #!.vscode/extensions.json
 .vscode
+.vs
 

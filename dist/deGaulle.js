@@ -327,7 +327,8 @@ const buildWebsite = function (opts, command) {
             nosort: true,
             nomount: true,
             nounique: false,
-            //nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
+            nocase: true,
+            //<-- uncomment this one for total failure to find any files >:-((
             nodir: true,
             nobrace: false,
             gitignore: true
@@ -434,7 +435,8 @@ const buildWebsite = function (opts, command) {
         nosort: true,
         nomount: true,
         nounique: false,
-        //nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
+        nocase: true,
+        //<-- uncomment this one for total failure to find any files >:-((
         nodir: true,
         nobrace: false,
         gitignore: true
@@ -631,7 +633,9 @@ const mdPluginCollective = require('markdown-it-dirty-dozen');
 
 const pkg = require('../package.json');
 
-const glob = require('glob');
+const glob = require('@gerhobbelt/glob');
+
+const gitignoreParser = require('@gerhobbelt/gitignore-parser');
 
 const assert = require('assert');
 
