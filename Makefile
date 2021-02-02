@@ -26,11 +26,20 @@ lintfix:
 format:
 	prettier-standard --format
 
-bundle:
+compile:
+	#-rm -rf ./js
+	#mkdir js
+	tsc --build
+
+bundle: compile
 	-rm -rf ./dist
 	mkdir dist
-	microbundle --no-compress --target node --strict --name ${GLOBAL_NAME}
-	npx prepend-header 'dist/*js' support/header.js
+	microbundle --no-compress --target node --strict --name ${GLOBAL_NAME} -f modern
+	mv dist/${GLOBAL_NAME}.modern.js dist/${GLOBAL_NAME}.js
+	mv dist/${GLOBAL_NAME}.modern.js.map dist/${GLOBAL_NAME}.js.map
+	cp js/src/cli.js dist/cli.js
+	-chmod a+x dist/cli.js
+	prepend-header 'dist/*js' support/header.js
 
 test:
 	ava --verbose
@@ -89,10 +98,11 @@ report-config:
 	-echo "NPM_PACKAGE=${NPM_PACKAGE} NPM_VERSION=${NPM_VERSION} GLOBAL_NAME=${GLOBAL_NAME} BUNDLE_NAME=${BUNDLE_NAME} TMP_PATH=${TMP_PATH} REMOTE_NAME=${REMOTE_NAME} REMOTE_REPO=${REMOTE_REPO} CURR_HEAD=${CURR_HEAD}"
 
 
-doc:
-	npx deGaulle build ../qiqqa/docs-src/ ./docs/
+doc: bundle
+	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
+	dist/cli.js build docs-src/
 
 
-.PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle
+.PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile
 .SILENT: help todo report-config

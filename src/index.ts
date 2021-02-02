@@ -19,9 +19,9 @@ const _ = require('lodash');
 const path = require('path');
 const fs = require('fs');
 
-let DEBUG = 1;
+let DEBUG = 10;
 
-const markdownTokens = {};
+const markdownTokens: Record<string, boolean> = {};
 
 interface ResultFileRecord {
   path: string;
@@ -241,7 +241,7 @@ async function sanityCheck(opts, command) {
   console.log('DEBUG = ', DEBUG);
 
   return new Promise((resolve, reject) => {
-    resolve();
+    resolve(0);
   });
 }
 
@@ -298,15 +298,18 @@ async function buildWebsite(opts, command) {
     });
     if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
-    for (const f of files || []) {
-      switch (path.basename(f.toLowerCase())) {
+    const filelist = files || [];
+    for (const f of filelist) {
+      console.log('Loop!', { f });
+      const basename = path.basename(f.toLowerCase());
+      console.log('Can this serve as root?', basename);
+      switch (basename) {
       case 'index.md':
         if (indexFilePriority < 10) {
           indexFilePriority = 10;
           indexFile = f;
         }
-
-        continue;
+        break;
 
       case 'index.htm':
       case 'index.html':
@@ -314,25 +317,28 @@ async function buildWebsite(opts, command) {
           indexFilePriority = 5;
           indexFile = f;
         }
-
-        continue;
+        break;
 
       case 'readme.md':
+        console.log('Hit!', basename);
         if (indexFilePriority < 1) {
           indexFilePriority = 1;
           indexFile = f;
         }
-
-        continue;
+        console.log('Continue!', indexFile);
+        break;
 
       default:
-        continue;
+        console.log('WUT?!', basename);
+        break;
       }
     }
+    console.log('Loop end!', indexFile);
 
+    console.log('root scan -> indexFile', indexFile);
     if (indexFile) {
       firstEntryPointPath = unixify(path.resolve(indexFile));
-      if (DEBUG >= 1) console.log('firstEntryPointPath', firstEntryPointPath);
+      if (DEBUG >= 1) console.log('root scan -> firstEntryPointPath', firstEntryPointPath);
       entryStats = fs.lstatSync(firstEntryPointPath);
     } else {
       throw new Error(
@@ -350,7 +356,6 @@ async function buildWebsite(opts, command) {
   }
 
   config.docTreeBasedir = path.dirname(firstEntryPointPath);
-
 
   let outputDirPath = paths[1] || path.join(config.docTreeBasedir, (!config.docTreeBasedir.endsWith('docs') ? '../docs' : '../' + path.basename(config.docTreeBasedir) + '-output'));
   // make sure we start with an absolute path; everything will derived off this one.
@@ -541,7 +546,7 @@ async function buildWebsite(opts, command) {
     },
 
     include: {
-      root: '/bogus/',
+      root: '/includes/',
       getRootDir: (options, state, startLine, endLine) => state.env.getIncludeRootDir(options, state, startLine, endLine)
     },
 
@@ -553,7 +558,6 @@ async function buildWebsite(opts, command) {
       }
     }
   });
-
 
   const allFiles: ResultsCollection = await scan;
   if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
@@ -896,3 +900,12 @@ function traverseTokens(tokens, cb, depth?: number) {
     }
   }
 }
+
+
+// demo()
+//   .then(() => {
+//      console.log('done');
+//   })
+//   .catch(err => {
+//     console.error('error:', err);
+//   });

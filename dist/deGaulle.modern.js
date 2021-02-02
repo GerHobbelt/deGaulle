@@ -29,7 +29,7 @@ const path = require('path');
 
 const fs = require('fs');
 
-let DEBUG = 1;
+let DEBUG = 10;
 const markdownTokens = {};
 const config = {
   docTreeBasedir: null,
@@ -163,7 +163,7 @@ async function sanityCheck(opts, command) {
   DEBUG = Math.max(DEBUG, Number.isFinite(+opts.debug) ? +opts.debug : opts.debug ? 1 : 0);
   console.log('DEBUG = ', DEBUG);
   return new Promise((resolve, reject) => {
-    resolve();
+    resolve(0);
   });
 }
 
@@ -210,16 +210,23 @@ async function buildWebsite(opts, command) {
       gitignore: true
     });
     if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+    const filelist = files || [];
 
-    for (const f of files || []) {
-      switch (path.basename(f.toLowerCase())) {
+    for (const f of filelist) {
+      console.log('Loop!', {
+        f
+      });
+      const basename = path.basename(f.toLowerCase());
+      console.log('Can this serve as root?', basename);
+
+      switch (basename) {
         case 'index.md':
           if (indexFilePriority < 10) {
             indexFilePriority = 10;
             indexFile = f;
           }
 
-          continue;
+          break;
 
         case 'index.htm':
         case 'index.html':
@@ -228,24 +235,31 @@ async function buildWebsite(opts, command) {
             indexFile = f;
           }
 
-          continue;
+          break;
 
         case 'readme.md':
+          console.log('Hit!', basename);
+
           if (indexFilePriority < 1) {
             indexFilePriority = 1;
             indexFile = f;
           }
 
-          continue;
+          console.log('Continue!', indexFile);
+          break;
 
         default:
-          continue;
+          console.log('WUT?!', basename);
+          break;
       }
     }
 
+    console.log('Loop end!', indexFile);
+    console.log('root scan -> indexFile', indexFile);
+
     if (indexFile) {
       firstEntryPointPath = unixify(path.resolve(indexFile));
-      if (DEBUG >= 1) console.log('firstEntryPointPath', firstEntryPointPath);
+      if (DEBUG >= 1) console.log('root scan -> firstEntryPointPath', firstEntryPointPath);
       entryStats = fs.lstatSync(firstEntryPointPath);
     } else {
       throw new Error(`Could not find a default entry point file (index.md, index.html or README.md) in the entry point directory ${firstEntryPointPath} (${scanPath}`);
@@ -420,7 +434,7 @@ async function buildWebsite(opts, command) {
       emphasis: readOptionalTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
     },
     include: {
-      root: '/bogus/',
+      root: '/includes/',
       getRootDir: (options, state, startLine, endLine) => state.env.getIncludeRootDir(options, state, startLine, endLine)
     },
     wikilinks: {
@@ -698,5 +712,11 @@ function traverseTokens(tokens, cb, depth) {
       traverseTokens(t.children, cb, depth + 1);
     }
   }
-}
+} // demo()
+//   .then(() => {
+//      console.log('done');
+//   })
+//   .catch(err => {
+//     console.error('error:', err);
+//   });
 //# sourceMappingURL=deGaulle.modern.js.map
