@@ -33,7 +33,12 @@ Also, *deGaulle* will help out in rewriting all the links in your generated page
 
   > If you wish to inject client-side code, be my guest, but know that we can do without. The goal is to keep the total attack surface as lean & mean as possible. Once published, your attention should be focused *elsewhere*, until the next site update!
   
-- no "opinionated" source directory layout, thank you very much.
+- no "opinionated" source directory layout, thank you very much. 
+
+  Your tooling should help you to **Write First, Organize Later** and therefor *not* force you into having to consider the *organization* of your documents while you write them. (https://erikwinter.nl/articles/2020/why-i-built-my-own-shitty-static-site-generator/ struck a chord with me!)
+  
+  `deGaulle` should be able to follow the links in your docs and extract the site *structure* from that data, enabling you to go in later and (re-)organize your documents on disk the way you see fit. (https://www.youtube.com/playlist?list=PLYwcgf10C65HG0xmaF31c7YiUTGWXpKff - after all, you *will* need to write those thoughts of yours to help you get organized and *then* write for *readers*.)
+
 - scan a directory tree and process everything in there. Userland code/config will tell us what to do with each, when defaults for type don't suffice.
 
   > Technically, I want something of a wildcarded [`glob`](https://www.npmjs.com/package/glob) scan of the entire kaboodle and then userland filters can decide what to do, if the *deGaulle* doesn't already do what you want by default.
