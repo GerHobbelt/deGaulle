@@ -1,11 +1,19 @@
 /* eslint-env mocha, es6 */
 
-const test = require('ava');
-const path = require('path');
-const generate = require('@gerhobbelt/markdown-it-testgen');
+import test from 'ava';
+import path from 'path';
+import generate from '@gerhobbelt/markdown-it-testgen';
+import markdown_it from '@gerhobbelt/markdown-it';
+
+import { fileURLToPath } from 'url';
+
+// see https://nodejs.org/docs/latest-v13.x/api/esm.html#esm_no_require_exports_module_exports_filename_dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 test('markdown-it-abbr', function (t) {
-  const md = require('@gerhobbelt/markdown-it')({ linkify: true });
+  const md = markdown_it({ linkify: true });
 
   generate.load(path.join(__dirname, 'fixtures/abbr.txt'), {}, function (data) {
     t.pass();

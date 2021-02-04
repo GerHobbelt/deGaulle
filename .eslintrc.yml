@@ -20,7 +20,11 @@ plugins:
 parserOptions:
   ecmaVersion: 2020
   sourceType: module
-
+  
+ignorePatterns:
+  - coverage/
+  - dist/
+  
 rules:
   accessor-pairs: 2
   array-bracket-spacing:
@@ -31,7 +35,7 @@ rules:
     ]
   block-scoped-var: 1
   block-spacing: 2
-  brace-style: [1, '1tbs', { allowSingleLine: true }]
+  brace-style:            [ 1, '1tbs', { allowSingleLine: true } ]
   # Postponed
   #callback-return:        2
   comma-dangle: 2
@@ -74,37 +78,37 @@ rules:
   new-parens: 2
   # Postponed
   #newline-after-var:      2
-  no-alert: 2
-  no-array-constructor: 2
-  no-bitwise: 2
-  no-caller: 2
-  no-case-declarations: 1
-  no-catch-shadow: 2
-  no-cond-assign: 2
-  no-console: 1
-  no-constant-condition: 1
-  no-control-regex: 1
-  no-debugger: 1
-  no-delete-var: 2
-  no-div-regex: 2
-  no-dupe-args: 2
-  no-dupe-keys: 2
-  no-duplicate-case: 2
-  no-else-return: 2
+  no-alert:               2
+  no-array-constructor:   2
+  no-bitwise:             2
+  no-caller:              2
+  no-case-declarations:   1
+  no-catch-shadow:        2
+  no-cond-assign:         2
+  no-console:             1
+  no-constant-condition:  1
+  no-control-regex:       1
+  no-debugger:            1
+  no-delete-var:          2
+  no-div-regex:           2
+  no-dupe-args:           2
+  no-dupe-keys:           2
+  no-duplicate-case:      2
+  no-else-return:         2
   # Tend to drop
   # no-empty:               1
   no-empty-character-class: 2
-  no-empty-pattern: 2
-  no-eq-null: 1
-  no-eval: 2
-  no-ex-assign: 2
-  no-extend-native: 2
-  no-extra-bind: 2
-  no-extra-boolean-cast: 2
-  no-extra-semi: 2
-  no-fallthrough: 2
-  no-floating-decimal: 2
-  no-func-assign: 2
+  no-empty-pattern:       2
+  no-eq-null:             1
+  no-eval:                2
+  no-ex-assign:           2
+  no-extend-native:       2
+  no-extra-bind:          2
+  no-extra-boolean-cast:  2
+  no-extra-semi:          2
+  no-fallthrough:         2
+  no-floating-decimal:    2
+  no-func-assign:         2
   # Postponed
   #no-implicit-coercion:   [2, { "boolean": true, "number": true, "string": true } ]
   no-implied-eval: 2
@@ -151,26 +155,25 @@ rules:
   no-undef-init: 2
   no-undefined: 1
   no-unexpected-multiline: 2
-  no-unreachable: 2
-  no-unused-expressions: 1
-  no-unused-vars: 1
-  no-use-before-define: 1
-  no-useless-escape: 1
-  no-var: 1
-  no-void: 2
-  no-with: 2
-  object-curly-spacing:
-    [2, always, { 'objectsInObjects': true, 'arraysInObjects': true }]
-  operator-assignment: 1
+  no-unreachable:         2
+  no-unused-expressions:  2
+  no-unused-vars:         1
+  no-use-before-define:   1
+  no-useless-escape:      1
+  no-var:                 1
+  no-void:                2
+  no-with:                2
+  object-curly-spacing:   [ 2, always, { "objectsInObjects": true, "arraysInObjects": true } ]
+  operator-assignment:    1
   # Postponed
   #operator-linebreak:     [ 2, after ]
-  semi: [2, always]
-  semi-spacing: 2
-  space-before-blocks: 2
-  space-before-function-paren: [1, { 'anonymous': 'always', 'named': 'never' }]
-  space-in-parens: [2, never]
-  space-infix-ops: 2
-  space-unary-ops: 2
+  semi:                   [ 2, always ]
+  semi-spacing:           2
+  space-before-blocks:  2
+  space-before-function-paren: [ 1, { "anonymous": "always", "named": "never" } ]
+  space-in-parens:        [ 2, never ]
+  space-infix-ops:        2
+  space-unary-ops:        2
   # Postponed
   #spaced-comment:         [ 1, always, { exceptions: [ '/', '=' ] } ]
   strict: [1, global]

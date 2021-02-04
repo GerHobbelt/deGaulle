@@ -2,47 +2,62 @@
 
 /* eslint no-console:0 */
 
-const argparse = require('argparse');
-const hdr = require('./header.js');
+import argparse from 'argparse';
 
-const cli = new argparse.ArgumentParser({
-  prog: 'getGlobalName',
-  version: hdr.version,
-  addHelp: true
-});
+async function action() {
+  const hdrMod = await import('./header.js');
+  const hdr = hdrMod.default;
 
-cli.addArgument([ 'type' ], {
-  help: 'type of name/string to produce',
-  nargs: '?',
-  choices: [ 'global', 'package', 'version', 'license', 'microbundle' ]
-});
+  const cli = new argparse.ArgumentParser({
+    prog: 'getGlobalName',
+    version: hdr.version,
+    addHelp: true
+  });
 
-const options = cli.parseArgs();
+  cli.addArgument([ 'type' ], {
+    help: 'type of name/string to produce',
+    nargs: '?',
+    choices: [ 'global', 'package', 'version', 'license', 'microbundle' ]
+  });
 
-////////////////////////////////////////////////////////////////////////////////
+  const options = cli.parseArgs();
 
-switch (options.type) {
-default:
-  cli.exit(1, cli.formatHelp());
-  break;
+  function print(msg) {
+    process.stdout.write(msg);
+  }
 
-case 'version':
-  cli.exit(0, hdr.version);
-  break;
+  ////////////////////////////////////////////////////////////////////////////////
 
-case 'package':
-  cli.exit(0, hdr.packageName);
-  break;
+  switch (options.type) {
+  default:
+    cli.exit(1, cli.formatHelp());
+    break;
 
-case 'global':
-  cli.exit(0, hdr.globalName);
-  break;
+  case 'version':
+    print(hdr.version);
+    cli.exit(0);
+    break;
 
-case 'microbundle':
-  cli.exit(0, hdr.safeVariableName);
-  break;
+  case 'package':
+    print(hdr.packageName);
+    cli.exit(0);
+    break;
 
-case 'license':
-  cli.exit(0, hdr.license);
-  break;
+  case 'global':
+    print(hdr.globalName);
+    cli.exit(0);
+    break;
+
+  case 'microbundle':
+    print(hdr.safeVariableName);
+    cli.exit(0);
+    break;
+
+  case 'license':
+    print(hdr.license);
+    cli.exit(0);
+    break;
+  }
 }
+
+action();

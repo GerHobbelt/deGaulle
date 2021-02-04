@@ -155,3 +155,4 @@ typings/
 .vscode
 .vs
 
+/obj/

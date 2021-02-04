@@ -18,12 +18,13 @@
   "bin": {
     "deGaulle": "dist/cli.js"
   },
+  "type": "module",
   "source": "js/src/index.js",
   "main": "dist/deGaulle.js",
   "esmodule": "dist/deGaulle.js",
   "types": "dist/deGaulle.d.ts",
   "engines": {
-    "node": ">=12"
+    "node": ">=12.20.0"
   },
   "scripts": {
     "build": "make",
@@ -38,14 +39,19 @@
     "cov": "make report-coverage",
     "pub": "npm publish --access public"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@gerhobbelt/gitignore-parser": "0.2.0-8",
     "@gerhobbelt/glob": "7.1.7-5",
-    "@gerhobbelt/markdown-it": "12.0.4-51",
+    "@gerhobbelt/markdown-it": "12.0.4-52",
     "@gerhobbelt/markdown-it-testgen": "0.1.6-17",
-    "@gerhobbelt/nomnom": "1.8.4-30",
+    "@gerhobbelt/markdown-it-wikilinks": "1.1.1-10",
+    "@gerhobbelt/nomnom": "1.8.4-31",
     "@gerhobbelt/prismjs": "1.20.1-2",
     "jsdom": "16.4.0",
+    "lodash": "^4.17.20",
     "markdown-it-dirty-dozen": "file:../../js/markdown-it-dirty-dozen"
   },
   "devDependencies": {
@@ -53,6 +59,7 @@
     "@gerhobbelt/prepend-header": "1.1.0-7",
     "@typescript-eslint/eslint-plugin": "4.14.2",
     "@typescript-eslint/parser": "4.14.2",
+    "argparse": "2.0.1",
     "ava": "3.15.0",
     "cross-env": "7.0.3",
     "eslint": "7.19.0",
@@ -61,5 +68,11 @@
     "prettier-standard": "16.4.1",
     "typescript": "4.1.3",
     "typescript-eslint": "0.0.1-alpha.0"
-  }
+  },
+  "reporter": [
+    "lcov",
+    "text",
+    "html",
+    "text-summary"
+  ]
 }

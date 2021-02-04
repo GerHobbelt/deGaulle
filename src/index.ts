@@ -1,23 +1,30 @@
 //
 //
 //
-const nomnom = require('@gerhobbelt/nomnom');
 
-const MarkDown = require('@gerhobbelt/markdown-it');
+import nomnom from '@gerhobbelt/nomnom';
 
-const mdPluginCollective = require('markdown-it-dirty-dozen');
+import MarkDown from '@gerhobbelt/markdown-it';
 
-const pkg = require('../package.json');
+import mdPluginCollective from 'markdown-it-dirty-dozen';
 
-const jsdom = require('jsdom');
+import { fileURLToPath } from 'url';
+
+// see https://nodejs.org/docs/latest-v13.x/api/esm.html#esm_no_require_exports_module_exports_filename_dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const pkg = JSON.parse(fs.readFileSync(path.normalize(path.join(__dirname, '../package.json')), 'utf8'));
+
+import jsdom from 'jsdom';
 const { JSDOM } = jsdom;
-const glob = require('@gerhobbelt/glob');
-const gitignoreParser = require('@gerhobbelt/gitignore-parser');
-const assert = require('assert');
-const _ = require('lodash');
+import glob from '@gerhobbelt/glob';
+import gitignoreParser from '@gerhobbelt/gitignore-parser';
+import assert from 'assert';
+import _ from 'lodash';
 
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
 
 let DEBUG = 10;
 
@@ -29,12 +36,16 @@ interface ResultFileRecord {
   ext: string;
   relativePath: string;
   destinationRelPath: string;
+  RawContent: any;
+  contentIsBinary: boolean;
 }
 interface ResultHtmlFileRecord extends ResultFileRecord {
   HtmlContent: string;
+  docTitle: string;
   HtmlHeadContent: string;
-  HtmlBody: any;
-  HtmlHead: any;
+  //HtmlBody: any;
+  //HtmlHead: any;
+  metaData: any;
 }
 type ResultTextAssetFileRecord = ResultFileRecord
 type ResultBinaryAssetFileRecord = ResultFileRecord
@@ -45,6 +56,8 @@ interface ResultsCollection {
   js: Map<string, ResultTextAssetFileRecord>;
   image: Map<string, ResultBinaryAssetFileRecord>;
   movie: Map<string, ResultBinaryAssetFileRecord>;
+  archive: Map<string, ResultBinaryAssetFileRecord>;
+  distro: Map<string, ResultBinaryAssetFileRecord>;
   misc: Map<string, ResultBinaryAssetFileRecord>;
   _: Map<string, ResultBinaryAssetFileRecord>;
 }
@@ -63,87 +76,98 @@ const config: ConfigRecord = {
 type getIncludeRootDirFn = (options: any, state: any, startLine: number, endLine: number) => string;
 interface MarkdownItEnvironment {
   getIncludeRootDir: getIncludeRootDirFn;
+  title: string | null;
 }
 
-nomnom.script('deGaulle');
 
-nomnom
-  .command('build')
-  .option('debug', {
-    abbr: 'd',
-    flag: false,
-    help: 'Print debugging info'
-  })
-  .option('config', {
-    abbr: 'c',
-    'default': 'config.json',
-    help: 'JSON file with tests to run'
-  })
-  .callback(function (opts, cmd) {
-    try {
-      buildWebsite(opts, cmd);
-    } catch (ex) {
-      console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
-      process.exit(5);
-    }
-  })
-  .help('build website from sources');
+export default function main() {
+  nomnom.script('deGaulle');
 
-nomnom
-  .command('sanity')
-  .option('debug', {
-    abbr: 'd',
-    flag: false,
-    help: 'Print debugging info'
-  })
-  .option('config', {
-    abbr: 'c',
-    'default': 'config.json',
-    help: 'JSON file with tests to run'
-  })
-  .option('outfile', {
-    abbr: 'o',
-    help: 'file to write results to'
-  })
-  .callback(function (opts, cmd) {
-    try {
-      sanityCheck(opts, cmd);
-    } catch (ex) {
-      console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
-      process.exit(5);
-    }
-  })
-  .help('run the sanity tests');
+  nomnom
+    .command('build')
+    .option('debug', {
+      abbr: 'd',
+      flag: false,
+      'default': 0,
+      help: 'Print debugging info'
+    })
+    .option('config', {
+      abbr: 'c',
+      'default': 'config.js',
+      help: 'JS script file with custom handlers'
+    })
+    .option('output', {
+      abbr: 'o',
+      flag: false,
+      help: 'directory to write results to'
+    })
+    .callback(function (opts, cmd) {
+      try {
+        buildWebsite(opts, cmd);
+      } catch (ex) {
+        console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
+        process.exit(5);
+      }
+    })
+    .help('build website from sources');
 
-nomnom
-  .nocommand()
-  .option('debug', {
-    abbr: 'd',
-    flag: false,
-    help: 'Print debugging info'
-  })
-  .option('config', {
-    abbr: 'c',
-    'default': 'config.json',
-    help: 'JSON file with tests to run'
-  })
-  .option('version', {
-    flag: true,
-    help: 'print version and exit',
-    callback: function () {
-      return `version ${pkg.version}`;
-    }
-  })
-  .callback(function (opts, cmd) {
-    try {
-      buildWebsite(opts, cmd);
-    } catch (ex) {
-      console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
-      process.exit(5);
-    }
-  });
+  nomnom
+    .command('sanity')
+    .option('debug', {
+      abbr: 'd',
+      flag: false,
+      help: 'Print debugging info'
+    })
+    .option('config', {
+      abbr: 'c',
+      'default': 'config.js',
+      help: 'JS script file with custom handlers'
+    })
+    .option('outfile', {
+      abbr: 'o',
+      help: 'file to write results to'
+    })
+    .callback(function (opts, cmd) {
+      try {
+        sanityCheck(opts, cmd);
+      } catch (ex) {
+        console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
+        process.exit(5);
+      }
+    })
+    .help('run the sanity tests');
 
-nomnom.parse();
+  nomnom
+    .nocommand()
+    .option('debug', {
+      abbr: 'd',
+      flag: false,
+      'default': 0,
+      help: 'Print debugging info'
+    })
+    .option('config', {
+      abbr: 'c',
+      'default': 'config.js',
+      help: 'JS script file with custom drivers'
+    })
+    .option('version', {
+      flag: true,
+      help: 'print version and exit',
+      callback: function () {
+        return `version ${pkg.version}`;
+      }
+    })
+    .callback(function (opts, cmd) {
+      try {
+        buildWebsite(opts, cmd);
+      } catch (ex) {
+        console.error(`ERROR: ${ex.message}\n\nException:\n${ex}`);
+        process.exit(5);
+      }
+    });
+
+  nomnom.parse();
+}
 
 
 
@@ -168,16 +192,64 @@ function absDstPath(rel) {
   return unixify(path.resolve(p));
 }
 
+const SANE_MAX_STRING_LENGTH = 2 * 120;
+
+function limitDebugOutput(str) {
+  if (str && str.length > SANE_MAX_STRING_LENGTH) {
+    str = `${str.slice(0, SANE_MAX_STRING_LENGTH - 20)}...\n  ... (length: ${str.length})`;
+  }
+  return str;
+}
+
+function limitDebugOutput4Map(collection) {
+  if (collection instanceof Map) {
+    const rv = new Map();
+
+    collection.forEach((value, key) => {
+      rv.set(key, showRec(value));
+    });
+    return rv;
+  }
+  return collection;
+}
+function limitDebugOutput4Collection(allFiles: ResultsCollection) {
+  if (allFiles) {
+    const rv = {
+    };
+
+    for (let type in allFiles) {
+      let m = allFiles[type];
+      rv[type] = limitDebugOutput4Map(m);
+    }
+    return rv;
+  }
+  return allFiles;
+}
+
+function showRec(rec) {
+  if (rec) {
+    let rv = Object.assign({}, rec);
+    for (let key in rv) {
+      let attr = rv[key];
+      if (typeof attr === "string" && attr.length > SANE_MAX_STRING_LENGTH) {
+        rv[key] = limitDebugOutput(attr);
+      }
+    }
+    return rv;
+  }
+  return rec;
+}
+
 function readOptionalTxtConfigFile(rel) {
   const p = absSrcPath(rel);
   if (fs.existsSync(p)) {
     const src = fs.readFileSync(p, 'utf8');
-  // - split into lines
-  // - filter out any lines whicch don't have an '='
-  // - split each line across the initial '=' in there.
-  // - turn this into a hash table?
-    let lines = src.split(/[\r\n]/g);
-    lines = lines.filter((l) => l.trim().length > 1 && l.includes('=')).map((l) => {
+    // - split into lines
+    // - filter out any lines which don't have an '='
+    // - split each line across the initial '=' in there.
+    // - turn this into a hash table?
+    const lines = src.split(/[\r\n]/g);
+    const linesarr = lines.filter((l) => l.trim().length > 1 && l.includes('=')).map((l) => {
       let parts = l.split('=');
       if (parts.length !== 2) {
         throw new Error(`config line in ${rel} is expected to have only one '='`);
@@ -186,7 +258,7 @@ function readOptionalTxtConfigFile(rel) {
       return parts;
     });
     const rv = {};
-    lines.forEach((l) => {
+    linesarr.forEach((l) => {
       rv[l[0]] = l[1];
     });
     return rv;
@@ -228,6 +300,24 @@ function myCustomPageNamePostprocessor(spec) {
   return spec;
 }
 
+async function loadConfigScript(configScript) {
+  if (configScript) {
+    // https://stackoverflow.com/questions/42453683/how-to-reject-in-async-await-syntax
+    try {
+      let processors = await import(configScript);
+      return processors;
+    } catch (err) {
+      console.error("######## ERROR: ", err);
+      throw new AggregateError([err], `Cannot open/load config script file '${configScript}'`);
+    }
+  } else {
+    return new Promise(async (resolve, reject) => {
+      let processors = {};
+      resolve(processors);
+    });
+  }
+}
+
 async function sanityCheck(opts, command) {
   console.log(
     `sanityCheck: command: ${command || '<no-command>'}, opts: ${JSON.stringify(
@@ -265,6 +355,17 @@ async function buildWebsite(opts, command) {
     throw new Error(
       'Must specify at least one file path as starting point. None were specified.'
     );
+  }
+
+  // load the config script, iff it exists:
+  const configScript = opts.config;
+
+  let processors = null;
+  try {
+    processors = await loadConfigScript(configScript);
+  } catch (err) {
+    console.error("##### ERROR while importing config script. (Will continue with a default script.)\nError: ", err);
+    processors = await loadConfigScript(null);
   }
 
   let firstEntryPointPath = paths[0];
@@ -412,6 +513,8 @@ async function buildWebsite(opts, command) {
           js: new Map(),
           image: new Map(),
           movie: new Map(),
+          archive: new Map(),
+          distro: new Map(),
           misc: new Map(),
           _: new Map()
         };
@@ -428,6 +531,7 @@ async function buildWebsite(opts, command) {
             'js',
             'mjs',
             'ejs',
+            'cjs',
             'ts',
             'coffee'
           ],
@@ -447,15 +551,53 @@ async function buildWebsite(opts, command) {
             'bmp',
             'svg',
             'psd',
-            'ai'
+            'ai',
+            'webp',
           ],
           movie: [
             'mkv',
             'mp4',
             'avi',
             'mov',
-            'flv'
-          ]
+            'flv',
+            'webm'
+          ],
+          archive: [
+            'zip',
+            'rar',
+            'gz',
+            'bz2',
+            '7z',
+          ],
+          distro: [
+            'exe',
+            'msi',
+          ],
+        };
+        const rv_mapping_bin_content = {
+          png: true,
+          gif: true,
+          jpg: true,
+          jpeg: true,
+          tiff: true,
+          bmp: true,
+          svg: false,
+          psd: true,
+          ai: true,
+          mkv: true,
+          mp4: true,
+          avi: true,
+          mov: true,
+          flv: true,
+          webm: true,
+          webp: true,
+          zip: true,
+          rar: true,
+          gz: true,
+          bz2: true,
+          '7z': true,
+          exe: true,
+          msi: true,
         };
         const rv_mapping = new Map();
         for (const n in rv_mapping_def) {
@@ -472,14 +614,16 @@ async function buildWebsite(opts, command) {
         for (const p of files || []) {
           const f = unixify(path.resolve(p));
           if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', { 'in': p, out: f });
-          const fname = path.basename(f.toLowerCase());
-          const ext = path.extname(fname);
+          const fname = path.basename(f).toLowerCase();
+          const ext = path.extname(fname).toLowerCase();
           const el: ResultFileRecord = {
             path: f,
             nameLC: fname,
             ext: ext,
             relativePath: unixify(path.relative(config.docTreeBasedir, f)),
-            destinationRelPath: null
+            destinationRelPath: null,
+            RawContent: null,
+            contentIsBinary: rv_mapping_bin_content[ext] || false
           };
           const cat = rv_mapping.get(ext) || 'misc';
           rv[cat].set(f, el);
@@ -560,7 +704,7 @@ async function buildWebsite(opts, command) {
   });
 
   const allFiles: ResultsCollection = await scan;
-  if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', allFiles);
+  if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', limitDebugOutput4Collection(allFiles));
 
   if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
     throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
@@ -571,18 +715,18 @@ async function buildWebsite(opts, command) {
   console.log(`processing root file: ${firstEntryPointPath}...`);
   const specRec = await compileMD(firstEntryPointPath, md, allFiles);
 
-  if (DEBUG >= 10) console.log('specRec:', specRec);
+  if (DEBUG >= 10) console.log('specRec:', showRec(specRec));
 
   // now process the other MD files too:
   for (const slot of allFiles.markdown) {
     const key = slot[0];
     const entry = slot[1];
     entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', entry);
+    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
 
     const specRec2 = await compileMD(key, md, allFiles);
 
-    if (DEBUG >= 3) console.log('specRec:', specRec2);
+    if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
     assert.strictEqual(specRec2, entry);
   }
 
@@ -591,11 +735,11 @@ async function buildWebsite(opts, command) {
     const key = slot[0];
     const entry = slot[1];
     entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', entry);
+    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
 
     const specRec2 = await loadHTML(key, allFiles);
 
-    if (DEBUG >= 3) console.log('specRec:', specRec2);
+    if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
     assert.strictEqual(specRec2, entry);
   }
 
@@ -616,11 +760,11 @@ async function buildWebsite(opts, command) {
           const key = slot[0];
           const entry = slot[1];
           entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
 
           const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
 
-          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
         }
       }
@@ -633,11 +777,11 @@ async function buildWebsite(opts, command) {
           const key = slot[0];
           const entry = slot[1];
           entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length));
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, entry);
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
 
           const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
 
-          if (DEBUG >= 3) console.log('specRec:', specRec2);
+          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
         }
       }
@@ -647,15 +791,97 @@ async function buildWebsite(opts, command) {
 
   // now's the time to match the links in the generated content and do some linkage reporting alongside:
   //
-  if (DEBUG >= 1) console.log('>>>>>>>>>>>>>>>>>>>> allFiles:', allFiles);
+  if (DEBUG >= 1) console.log('>>>>>>>>>>>>>>>>>>>> allFiles:', limitDebugOutput4Collection(allFiles));
   if (DEBUG >= 1) console.log('markdown AST token types:', Object.keys(markdownTokens).sort());
 
 
 
+  // output the files into the destination directory
+  console.log(
+    `buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(
+      opts,
+      null,
+      2
+    )}`
+  );
 
+  // now write the CSS, HTML, JS and other files:
+  for (const type in allFiles) {
+    switch (type) {
+    case '_':
+      continue;
 
+    case 'html':
+    case 'markdown':
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key = slot[0];
+          const entry = slot[1];
+          const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath + '.html'));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
 
+          let title = entry.docTitle;
+          if (title && title.trim()) {
+            title = `<title>${title}</title>`;
+          } else {
+            title = '';
+          }
+          const miscHeaderContent = entry.HtmlHeadContent || '';
+          const bodyContent = entry.HtmlContent;
+          const originalPath = entry.relativePath;
 
+          const content = `
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    ${ title }
+    ${ bodyContent }
+  </head>
+  <body>
+    
+    ${ bodyContent }
+
+    <footer>
+      © 2020 Qiqqa Contributors ::
+      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/docs-src/${ originalPath }">Edit this page on GitHub</a>
+    </footer>
+  </body>
+</html>
+`.trimLeft();
+
+          const dstDir = unixify(path.dirname(destFilePath));
+          fs.mkdirSync(dstDir, { recursive: true });
+          fs.writeFileSync(destFilePath, content, 'utf8');
+          //el.HtmlContent = content;
+          //el.HtmlHeadContent = headEl.innerHTML;
+          //el.HtmlBody = bodyEl;
+          //el.HtmlHead = headEl;
+        }
+      }
+      continue;
+
+    case 'css':
+    case 'js':
+    default:
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key: string = slot[0];
+          const entry: ResultFileRecord = slot[1];
+          const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath + entry.ext));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
+
+          const dstDir = unixify(path.dirname(destFilePath));
+          fs.mkdirSync(dstDir, { recursive: true });
+          fs.copyFileSync(entry.path, destFilePath, fs.constants.COPYFILE_FICLONE);
+        }
+      }
+      continue;
+    }
+  }
 }
 
 
@@ -678,10 +904,11 @@ async function compileMD(mdPath, md, allFiles) {
         }
 
         const env : MarkdownItEnvironment = {
-          getIncludeRootDir: null
+          getIncludeRootDir: null,
+          title: null
         };
 
-        if (DEBUG >= 8)          console.log('source:\n', data);
+        if (DEBUG >= 8)          console.log(`source: length: ${data.length}`);
 
         // augment the md instance for use with the markdown_it_include plugin:
         env.getIncludeRootDir = function (options, state, startLine, endLine) {
@@ -696,13 +923,21 @@ async function compileMD(mdPath, md, allFiles) {
         const state = new md.core.State(data, md, env);
         md.core.process(state);
         const tokens = state.tokens;
+        const metadata = {
+          frontMatter: null,
+          docTitle: null
+        };
 
-        if (DEBUG >= 10) console.log('tokens:\n', JSON.stringify(cleanTokensForDisplay(tokens), null, 2));
+        if (DEBUG >= 10) console.log('tokens:\n', limitDebugOutput(JSON.stringify(cleanTokensForDisplay(tokens), null, 2)));
 
         const typeMap = new Set();
         traverseTokens(tokens, (t, idx, arr, depth) => {
           typeMap.add(t.type);
           markdownTokens[t.type] = true;
+
+          if (t.type === 'front_matter') {
+            metadata.frontMatter = t.meta;
+          }
         });
         if (DEBUG >= 4) console.log('token types:', typeMap);
 
@@ -727,9 +962,13 @@ async function compileMD(mdPath, md, allFiles) {
           });
         }
 
+        if (!env.title) {
+          metadata.docTitle = env.title;
+        }
+
         const content = md.renderer.render(tokens, md.options, env);
 
-        if (DEBUG >= 4) console.log('output:\n', content);
+        if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
 
         const dom = new JSDOM('<html><head>\n' + content,
           { includeNodeLocations: true }
@@ -738,16 +977,17 @@ async function compileMD(mdPath, md, allFiles) {
         const document = dom.window.document;
         const bodyEl = document.body; // implicitly created
         const headEl = document.querySelector('head');
-        if (DEBUG >= 1)          console.log('MARKDOWN:\n', { html: document, body: bodyEl.innerHTML, head: headEl.innerHTML });
+        if (DEBUG >= 1)          console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
 
         // update the file record:
         const el = allFiles.markdown.get(mdPath);
-        if (DEBUG >= 3) console.log('update the file record:', { mdPath, el });
+        if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
         el.HtmlContent = content;
         //el.HtmlContent = bodyEl.innerHTML;
         el.HtmlHeadContent = headEl.innerHTML;
-        el.HtmlBody = bodyEl;
-        el.HtmlHead = headEl;
+        //el.HtmlBody = bodyEl;
+        //el.HtmlHead = headEl;
+        el.metaData = metadata;
 
         resolve(el);
       }
@@ -774,7 +1014,7 @@ async function loadHTML(htmlPath, allFiles) {
           return;
         }
 
-        if (DEBUG >= 1)          console.log('source:\n', data);
+        if (DEBUG >= 8)          console.log(`source: length: ${data.length}`);
 
         const dom = new JSDOM(data,
           { includeNodeLocations: true }
@@ -783,14 +1023,21 @@ async function loadHTML(htmlPath, allFiles) {
         const document = dom.window.document;
         const bodyEl = document.body; // implicitly created
         const headEl = document.querySelector('head');
-        if (DEBUG >= 1)          console.log('HTML:\n', { html: document, body: bodyEl.innerHTML, head: headEl.innerHTML });
+        const titleEl = headEl && headEl.querySelector('title');
+        const title = titleEl && titleEl.innerHTML;
+
+        if (DEBUG >= 1)          console.log('HTML:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
 
         // update the file record:
         const el = allFiles.html.get(htmlPath);
         el.HtmlContent = bodyEl.innerHTML;
         el.HtmlHeadContent = headEl.innerHTML;
-        el.HtmlBody = bodyEl;
-        el.HtmlHead = headEl;
+        //el.HtmlBody = bodyEl;
+        //el.HtmlHead = headEl;
+
+        el.metaData = {
+          docTitle: title
+        };
 
         resolve(el);
       }
@@ -815,7 +1062,7 @@ async function loadFixedAssetTextFile(filePath, allFiles, collection) {
           return;
         }
 
-        if (DEBUG >= 1)          console.log('source:\n', data);
+        if (DEBUG >= 8)          console.log(`source: length: ${data.length}`);
 
         // update the file record:
         const el = collection.get(filePath);
@@ -830,28 +1077,24 @@ async function loadFixedAssetTextFile(filePath, allFiles, collection) {
 async function loadFixedAssetBinaryFile(filePath, allFiles, collection) {
   console.log(`processing file: ${filePath}...`);
 
+  // We DO NOT load binary fgiles as that would only clutter the nodeJS heap memory and cause out-of-memory exceptions.
   return new Promise((resolve, reject) => {
-    fs.readFile(
-      filePath,
-      {
-        encoding: 'utf8'
-      },
-      async (err, data) => {
-        if (err) {
-          reject(new Error(
-            `ERROR: read error ${err} for file ${filePath}`
-          ));
-          return;
-        }
+    let x = fs.existsSync(filePath);
+    if (!x) {
+      reject(new Error(
+        `ERROR: file '${filePath}' does not exist.`
+      ));
+      return;
+    }
 
-        if (DEBUG >= 1)          console.log('source:\n', data);
+    //if (DEBUG >= 8)          console.log(`source: length: ${data.length}`);
 
-        // update the file record:
-        const el = collection.get(filePath);
+    // update the file record:
+    const el = collection.get(filePath);
+    //el.RawContent = data;
+    el.contentIsBinary = true;
 
-        resolve(el);
-      }
-    );
+    resolve(el);
   });
 }
 
