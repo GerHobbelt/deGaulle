@@ -598,40 +598,44 @@ async function buildWebsite(opts, command) {
     throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
   }
 
-  console.log(`processing root file: ${firstEntryPointPath}...`);
-  const specRec = await compileMD(firstEntryPointPath, md, allFiles);
-  if (DEBUG >= 10) console.log('specRec:', showRec(specRec)); // now process the other MD files too:
-
-  for (const slot of allFiles.markdown) {
-    const key = slot[0];
-    const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
-
-    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
-    const specRec2 = await compileMD(key, md, allFiles);
-    if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-    assert.strictEqual(specRec2, entry);
-  } // now process the HTML files:
-
-
-  for (const slot of allFiles.html) {
-    const key = slot[0];
-    const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
-
-    entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-    if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
-    const specRec2 = await loadHTML(key, allFiles);
-    if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-    assert.strictEqual(specRec2, entry);
-  } // now process the CSS, JS and other 'fixed assets' files:
+  console.log('processing/loading site files...'); // now process the HTML, MD, CSS, JS and other 'fixed assets' files:
   //
   // [css, js, image, movie, misc, _]
 
-
   for (const type in allFiles) {
     switch (type) {
-      case 'html':
       case 'markdown':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
+            const specRec2 = await compileMD(key, md, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'html':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
+            const specRec2 = await loadHTML(key, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
         continue;
 
       case 'css':
@@ -672,7 +676,251 @@ async function buildWebsite(opts, command) {
 
 
   if (DEBUG >= 2) console.log('>>>>>>>>>>>>>>>>>>>> allFiles:', limitDebugOutput4Collection(allFiles));
-  if (DEBUG >= 1) console.log('markdown AST token types:', Object.keys(markdownTokens).sort()); // output the files into the destination directory
+  if (DEBUG >= 1) console.log('markdown AST token types:', Object.keys(markdownTokens).sort());
+  console.log('tracing site files...'); // now trace the access graph:
+  //
+  // [css, js, image, movie, misc, _]
+
+  for (const type in allFiles) {
+    switch (type) {
+      case 'markdown':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
+            const specRec2 = await compileMD(key, md, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'html':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
+            const specRec2 = await loadHTML(key, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'css':
+      case 'js':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      default:
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+    }
+  }
+
+  console.log('updating/patching site files...'); // now patch links, etc. in the HTML, MarkDown, CSS and JS files:
+  //
+  // [css, js, image, movie, misc, _]
+
+  for (const type in allFiles) {
+    switch (type) {
+      case 'markdown':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
+            const specRec2 = await compileMD(key, md, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'html':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
+            const specRec2 = await loadHTML(key, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'css':
+      case 'js':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      default:
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+    }
+  }
+
+  console.log('rendering site files\' content...'); // render the HTML, MarkDown, CSS and JS files' content:
+  //
+  // [css, js, image, movie, misc, _]
+
+  for (const type in allFiles) {
+    switch (type) {
+      case 'markdown':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
+            const specRec2 = await compileMD(key, md, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'html':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
+
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
+            const specRec2 = await loadHTML(key, allFiles);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      case 'css':
+      case 'js':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+
+      default:
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
+            const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
+            if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
+            assert.strictEqual(specRec2, entry);
+          }
+        }
+        continue;
+    }
+  } //
+  // Apply the template? Nah, that must have already happened in the render phase.
+  // If we have special 'generated content only' pages, such as the index page to a catalog site,
+  // that *still* is done through a (possibly empty, except for some metadata perhaps) `index.html`
+  // or README.md or other *content* file: the custom code can decide which bit of the template
+  // collective to apply to each page, so that would then apply a 'overview/index/landing' page
+  // template to such a (hypothetical) page.
+  //
+  // Hence we come to the conclusion now: every page being written is written by a (possibly empty)
+  // content page. If the content page is absent, the page simply is NOT generated.
+  //
+  // Meanwhile, the custom code decides which template file((s) are applied to each content item
+  // in the allFiles list.
+  //
+  // ---
+  //
+  // Yes, this means we'll have content pages for the 404 and other landing pages too. If they are
+  // absent, we do not have those landing pages. Simple as that.
+  //
+  // output the files into the destination directory
+
 
   console.log(`buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`); // now write the CSS, HTML, JS and other files:
 
@@ -699,6 +947,8 @@ async function buildWebsite(opts, command) {
             } else {
               title = '';
             }
+
+            const miscHeaderContent = entry.HtmlHeadContent || '';
             const bodyContent = entry.HtmlContent;
             const originalPath = entry.relativePath;
             const content = `
@@ -708,7 +958,7 @@ async function buildWebsite(opts, command) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${title}
-    ${bodyContent}
+    ${miscHeaderContent}
   </head>
   <body>
 
@@ -757,7 +1007,7 @@ async function buildWebsite(opts, command) {
   if (DEBUG >= 1) console.log(`Copying the extra files to the website destination directory '${config.docTreeBasedir}'...`); // add a couple of important files, which are probably not included in the file list yet:
 
   ['CNAME', '.nojekyll'].forEach(f => {
-    let p = unixify(path.resolve(path.join(config.docTreeBasedir, f)));
+    const p = unixify(path.resolve(path.join(config.docTreeBasedir, f)));
 
     if (fs.existsSync(p)) {
       const destFilePath = unixify(path.join(opts.output, f));
@@ -768,7 +1018,9 @@ async function buildWebsite(opts, command) {
       fs.copyFileSync(p, destFilePath, fs.constants.COPYFILE_FICLONE);
     }
   });
-}
+} // compile the MarkDown files to a token stream. Belay *rendering* until all files, including the HTML files out there,
+// have been processed as we will be patching some tokens in there before the end is neigh!
+
 
 async function compileMD(mdPath, md, allFiles) {
   if (DEBUG >= 3) console.log(`processing file: ${mdPath}...`);
@@ -850,7 +1102,9 @@ async function compileMD(mdPath, md, allFiles) {
       resolve(el);
     });
   });
-}
+} // compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
+// have been processed as we will be patching some DOM nodes in there before the end is neigh!
+
 
 async function loadHTML(htmlPath, allFiles) {
   if (DEBUG >= 3) console.log(`processing file: ${htmlPath}...`);
