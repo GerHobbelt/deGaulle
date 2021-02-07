@@ -3,6 +3,7 @@
 //
 
 import nomnom from '@gerhobbelt/nomnom';
+import slug from '@gerhobbelt/slug';
 
 import MarkDown from '@gerhobbelt/markdown-it';
 
@@ -40,11 +41,15 @@ interface ResultFileRecord {
   contentIsBinary: boolean;
 }
 interface ResultHtmlFileRecord extends ResultFileRecord {
+  HtmlDocument: any;
   HtmlContent: string;
   docTitle: string;
   HtmlHeadContent: string;
   //HtmlBody: any;
   //HtmlHead: any;
+  mdState: any;
+  mdEnv: MarkdownItEnvironment;
+  mdTypeMap: Set<string>;
   metaData: any;
 }
 type ResultTextAssetFileRecord = ResultFileRecord
@@ -74,6 +79,7 @@ const config: ConfigRecord = {
 };
 
 type getIncludeRootDirFn = (options: any, state: any, startLine: number, endLine: number) => string;
+
 interface MarkdownItEnvironment {
   getIncludeRootDir: getIncludeRootDirFn;
   title: string | null;
@@ -212,6 +218,7 @@ function limitDebugOutput4Map(collection) {
   }
   return collection;
 }
+
 function limitDebugOutput4Collection(allFiles: ResultsCollection) {
   if (allFiles) {
     const rv = {
@@ -239,6 +246,72 @@ function showRec(rec) {
   }
   return rec;
 }
+
+
+
+
+function slugify4Path(filePath) {
+  return slug(filePath, {
+    mode: 'path'
+  });
+}
+
+function slugify4TitleId(title) {
+  return slug(title, {
+    mode: 'pretty'   // or should we use uslug?
+  });
+}
+
+function slugify4FileName(filePath: string, maxLength = 64) {
+  const hash = cyrb53hash(filePath);
+  const hashStr = hash.toString(16);
+
+  const basename = path.basename(filePath) + path.extname(filePath);
+  const nameslug = slug(basename, {
+    mode: 'path'
+  });
+
+  const dir = path.dirname(filePath);
+  const dirslug = slug(dir, {
+    mode: 'path'
+  });
+
+  const dirWords = dirslug.split('-');
+  const nameWords = nameslug.split('-');
+  let n = maxLength - hashStr.length;
+  const w: string[] = [];
+  let i = 0;
+  while (n >= 1 + nameWords[i].length && i < nameWords.length) {
+    n -= 1 + nameWords[i].length;
+    w.push(nameWords[i++]);
+  }
+  w.push(hashStr);
+  i = dirWords.length - 1;
+  while (n >= 1 + dirWords[i].length && i >= 0) {
+    n -= 1 + dirWords[i].length;
+    w.unshift(dirWords[i--]);
+  }
+
+  const sl = w.join('-');
+  return sl;
+}
+
+
+// CYRB53 hash (NOT a secure hash)
+// as per https://stackoverflow.com/questions/7616461/generate-a-hash-from-string-in-javascript/52171480#52171480
+// (re `number` type: see https://spin.atomicobject.com/2018/11/05/using-an-int-type-in-typescript/ - deemed too much cost & effort right now)
+function cyrb53hash(str: string, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
 
 function readOptionalTxtConfigFile(rel) {
   const p = absSrcPath(rel);
@@ -298,6 +371,9 @@ function myCustomPageNamePostprocessor(spec) {
 
   return spec;
 }
+
+
+
 
 async function loadConfigScript(configScript) {
   if (configScript) {
@@ -755,6 +831,9 @@ async function buildWebsite(opts, command) {
   // [css, js, image, movie, misc, _]
   for (const type in allFiles) {
     switch (type) {
+    case '_':
+      continue;
+
     case 'markdown':
       {
         const collection = allFiles[type];
@@ -844,20 +923,16 @@ async function buildWebsite(opts, command) {
   // [css, js, image, movie, misc, _]
   for (const type in allFiles) {
     switch (type) {
+    case '_':
+      continue;
+
     case 'markdown':
       {
         const collection = allFiles[type];
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          // as these pages will be rendered to HTML, they'll receive the html extension:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
-
-          const specRec2 = await compileMD(key, md, allFiles);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
+          //entry.destinationRelPath
         }
       }
       continue;
@@ -869,13 +944,7 @@ async function buildWebsite(opts, command) {
           const key = slot[0];
           const entry = slot[1];
           // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
-
-          const specRec2 = await loadHTML(key, allFiles);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
+          //entry.destinationRelPath
         }
       }
       continue;
@@ -887,13 +956,7 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
-
-          const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
+          //entry.destinationRelPath
         }
       }
       continue;
@@ -904,13 +967,7 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
-
-          const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
+          //entry.destinationRelPath
         }
       }
       continue;
@@ -933,20 +990,15 @@ async function buildWebsite(opts, command) {
   // [css, js, image, movie, misc, _]
   for (const type in allFiles) {
     switch (type) {
+    case '_':
+      continue;
+
     case 'markdown':
       {
         const collection = allFiles[type];
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          // as these pages will be rendered to HTML, they'll receive the html extension:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
-
-          const specRec2 = await compileMD(key, md, allFiles);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
         }
       }
       continue;
@@ -957,14 +1009,6 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
-
-          const specRec2 = await loadHTML(key, allFiles);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
         }
       }
       continue;
@@ -976,13 +1020,6 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
-
-          const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
         }
       }
       continue;
@@ -993,13 +1030,6 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
-
-          const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
         }
       }
       continue;
@@ -1027,17 +1057,17 @@ async function buildWebsite(opts, command) {
   // [css, js, image, movie, misc, _]
   for (const type in allFiles) {
     switch (type) {
+    case '_':
+      continue;
+
     case 'markdown':
       {
         const collection = allFiles[type];
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          // as these pages will be rendered to HTML, they'll receive the html extension:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
 
-          const specRec2 = await compileMD(key, md, allFiles);
+          const specRec2 = await renderMD(key, md, allFiles);
 
           if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
@@ -1051,11 +1081,8 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
-          if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
 
-          const specRec2 = await loadHTML(key, allFiles);
+          const specRec2 = await renderHTML(key, allFiles);
 
           if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
@@ -1070,10 +1097,8 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
 
-          const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
+          const specRec2 = await renderFixedAssetTextFile(key, allFiles, collection);
 
           if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
@@ -1082,20 +1107,7 @@ async function buildWebsite(opts, command) {
       continue;
 
     default:
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-          entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
-          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
-
-          const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
-
-          if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
-          assert.strictEqual(specRec2, entry);
-        }
-      }
+         // we do not 'render' the binary files, right?
       continue;
     }
   }
@@ -1139,7 +1151,7 @@ async function buildWebsite(opts, command) {
   );
 
   // now write the CSS, HTML, JS and other files:
-  if (DEBUG >= 1) console.log(`Writing all processed & collected files to the website destination directory '${config.docTreeBasedir}'...`);
+  console.log(`Writing all processed & collected files to the website destination directory '${config.docTreeBasedir}'...`);
 
   for (const type in allFiles) {
     switch (type) {
@@ -1235,6 +1247,9 @@ async function buildWebsite(opts, command) {
 
 
 
+
+
+
 // compile the MarkDown files to a token stream. Belay *rendering* until all files, including the HTML files out there,
 // have been processed as we will be patching some tokens in there before the end is neigh!
 async function compileMD(mdPath, md, allFiles) {
@@ -1281,7 +1296,7 @@ async function compileMD(mdPath, md, allFiles) {
 
         if (DEBUG >= 10) console.log('tokens:\n', limitDebugOutput(JSON.stringify(cleanTokensForDisplay(tokens), null, 2)));
 
-        const typeMap = new Set();
+        const typeMap: Set<string> = new Set();
         traverseTokens(tokens, (t, idx, arr, depth) => {
           typeMap.add(t.type);
           markdownTokens[t.type] = true;
@@ -1317,27 +1332,14 @@ async function compileMD(mdPath, md, allFiles) {
           metadata.docTitle = env.title;
         }
 
-        const content = md.renderer.render(tokens, md.options, env);
-
-        if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
-
-        const dom = new JSDOM('<html><head>\n' + content,
-          { includeNodeLocations: true }
-        );
-
-        const document = dom.window.document;
-        const bodyEl = document.body; // implicitly created
-        const headEl = document.querySelector('head');
-        if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
 
         // update the file record:
         const el = allFiles.markdown.get(mdPath);
         if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
-        el.HtmlContent = content;
-        //el.HtmlContent = bodyEl.innerHTML;
-        el.HtmlHeadContent = headEl.innerHTML;
-        //el.HtmlBody = bodyEl;
-        //el.HtmlHead = headEl;
+
+        el.mdState = state;
+        el.mdEnv = env;
+        el.mdTypeMap = typeMap;
         el.metaData = metadata;
 
         resolve(el);
@@ -1345,6 +1347,61 @@ async function compileMD(mdPath, md, allFiles) {
     );
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+// compile the MarkDown files to a token stream. Belay *rendering* until all files, including the HTML files out there,
+// have been processed as we will be patching some tokens in there before the end is neigh!
+async function renderMD(mdPath, md, allFiles) {
+  if (DEBUG >= 3) console.log(`processing file: ${mdPath}...`);
+
+  return new Promise((resolve, reject) => {
+    const el = allFiles.markdown.get(mdPath);
+
+    const state = el.mdState;
+    const env = el.mdEnv;
+    const typeMap = el.mdTypeMap;
+    const metadata = el.metaData;
+
+    const tokens = state.tokens;
+
+    const content = md.renderer.render(tokens, md.options, env);
+
+    if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
+
+    const dom = new JSDOM('<html><head>\n' + content,
+      { includeNodeLocations: true }
+    );
+
+    const document = dom.window.document;
+    const bodyEl = document.body; // implicitly created
+    const headEl = document.querySelector('head');
+    if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
+
+        // update the file record:
+    if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
+    el.HtmlDocument = document;
+    el.HtmlContent = content;
+        //el.HtmlContent = bodyEl.innerHTML;
+    el.HtmlHeadContent = headEl.innerHTML;
+        //el.HtmlBody = bodyEl;
+        //el.HtmlHead = headEl;
+    el.metaData = metadata;
+
+    resolve(el);
+  });
+}
+
+
 
 
 
@@ -1383,6 +1440,8 @@ async function loadHTML(htmlPath, allFiles) {
 
         // update the file record:
         const el = allFiles.html.get(htmlPath);
+        el.HtmlDocument = document;
+
         el.HtmlContent = bodyEl.innerHTML;
         el.HtmlHeadContent = headEl.innerHTML;
         //el.HtmlBody = bodyEl;
@@ -1397,6 +1456,51 @@ async function loadHTML(htmlPath, allFiles) {
     );
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+// compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
+// have been processed as we will be patching some DOM nodes in there before the end is neigh!
+async function renderHTML(htmlPath, allFiles) {
+  if (DEBUG >= 3) console.log(`processing file: ${htmlPath}...`);
+
+  return new Promise((resolve, reject) => {
+    const el = allFiles.html.get(htmlPath);
+
+    const document = el.HtmlDocument;
+    const bodyEl = document.body; // implicitly created
+    const headEl = document.querySelector('head');
+    const titleEl = headEl && headEl.querySelector('title');
+    const title = titleEl && titleEl.innerHTML;
+
+    if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
+
+        // update the file record:
+    el.HtmlContent = bodyEl.innerHTML;
+    el.HtmlHeadContent = headEl.innerHTML;
+        //el.HtmlBody = bodyEl;
+        //el.HtmlHead = headEl;
+
+    el.metaData = {
+      docTitle: title
+    };
+
+    resolve(el);
+  });
+}
+
+
+
+
+
 
 async function loadFixedAssetTextFile(filePath, allFiles, collection) {
   if (DEBUG >= 3) console.log(`processing file: ${filePath}...`);
@@ -1427,10 +1531,35 @@ async function loadFixedAssetTextFile(filePath, allFiles, collection) {
   });
 }
 
+
+
+
+
+
+
+async function renderFixedAssetTextFile(filePath, allFiles, collection) {
+  if (DEBUG >= 3) console.log(`processing file: ${filePath}...`);
+
+  return new Promise((resolve, reject) => {
+        // update the file record:
+    const el = collection.get(filePath);
+        //el.RawContent = data;
+
+    resolve(el);
+  });
+}
+
+
+
+
+
+
+
+
 async function loadFixedAssetBinaryFile(filePath, allFiles, collection) {
   if (DEBUG >= 3) console.log(`processing file: ${filePath}...`);
 
-  // We DO NOT load binary fgiles as that would only clutter the nodeJS heap memory and cause out-of-memory exceptions.
+  // We DO NOT load binary files as that would only clutter the nodeJS heap memory and cause out-of-memory exceptions.
   return new Promise((resolve, reject) => {
     const x = fs.existsSync(filePath);
     if (!x) {
@@ -1450,6 +1579,9 @@ async function loadFixedAssetBinaryFile(filePath, allFiles, collection) {
     resolve(el);
   });
 }
+
+
+
 
 
 function cleanTokensForDisplay(tokens) {
