@@ -45,7 +45,7 @@
   "dependencies": {
     "@gerhobbelt/gitignore-parser": "0.2.0-8",
     "@gerhobbelt/glob": "7.1.7-5",
-    "@gerhobbelt/markdown-it": "12.0.4-52",
+    "@gerhobbelt/markdown-it": "12.0.4-53",
     "@gerhobbelt/markdown-it-testgen": "0.1.6-17",
     "@gerhobbelt/markdown-it-wikilinks": "1.1.1-10",
     "@gerhobbelt/nomnom": "1.8.4-31",

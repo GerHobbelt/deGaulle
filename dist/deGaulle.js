@@ -584,6 +584,7 @@ async function buildWebsite(opts, command) {
       links: readOptionalTxtConfigFile('.deGaulle/abbr-links.txt'),
       emphasis: readOptionalTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
     },
+    attrs: true,
     anchor: {
       permalink: true,
       permalinkBefore: true,
@@ -619,9 +620,9 @@ async function buildWebsite(opts, command) {
     // [[toc]]
     tableOfContents: false,
     // @[toc](Title)
-    toc: true,
+    toc: false,
     // @[toc]               -- no title...
-    tocAndAnchor: false,
+    tocAndAnchor: true,
     // ${toc} | [[toc]]     -- but we removed that last version by specifying a custom placeholder here:
     tocDoneRight: {
       placeholder: '(\\$\\{toc\\})',
@@ -912,7 +913,8 @@ async function buildWebsite(opts, command) {
             const entry = slot[1];
             const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
-            let title = entry.docTitle;
+            filterHtmlHeadAfterMetadataExtraction(entry);
+            let title = entry.docTitle || path.basename(entry.relativePath, entry.ext);
 
             if (title && title.trim()) {
               title = `<title>${title}</title>`;
@@ -920,8 +922,8 @@ async function buildWebsite(opts, command) {
               title = '';
             }
 
-            const miscHeaderContent = entry.HtmlHeadContent || '';
-            const bodyContent = entry.HtmlContent;
+            const htmlHead = entry.HtmlHead;
+            const htmlBody = entry.HtmlBody;
             const originalPath = entry.relativePath;
             const content = `
 <!doctype html>
@@ -930,11 +932,11 @@ async function buildWebsite(opts, command) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${title}
-    ${miscHeaderContent}
+    ${htmlHead.innerHTML}
   </head>
   <body>
 
-    ${bodyContent}
+    ${htmlBody.innerHTML}
 
     <footer>
       © 2020 Qiqqa Contributors ::
@@ -947,10 +949,7 @@ async function buildWebsite(opts, command) {
             fs.mkdirSync(dstDir, {
               recursive: true
             });
-            fs.writeFileSync(destFilePath, content, 'utf8'); //el.HtmlContent = content;
-            //el.HtmlHeadContent = headEl.innerHTML;
-            //el.HtmlBody = bodyEl;
-            //el.HtmlHead = headEl;
+            fs.writeFileSync(destFilePath, content, 'utf8'); //el.RenderedHtmlContent = content;
           }
         }
         continue;
@@ -1072,7 +1071,7 @@ async function renderMD(mdPath, md, allFiles) {
     const tokens = state.tokens;
     const content = md.renderer.render(tokens, md.options, env);
     if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
-    const dom = new JSDOM('<html><head>\n' + content, {
+    const dom = new JSDOM('<html><head><body>\n' + content, {
       includeNodeLocations: true
     });
     const document = dom.window.document;
@@ -1090,11 +1089,8 @@ async function renderMD(mdPath, md, allFiles) {
       el: showRec(el)
     });
     el.HtmlDocument = document;
-    el.HtmlContent = content; //el.HtmlContent = bodyEl.innerHTML;
-
-    el.HtmlHeadContent = headEl.innerHTML; //el.HtmlBody = bodyEl;
-    //el.HtmlHead = headEl;
-
+    el.HtmlBody = bodyEl;
+    el.HtmlHead = headEl;
     el.metaData = metadata;
     resolve(el);
   });
@@ -1131,16 +1127,22 @@ async function loadHTML(htmlPath, allFiles) {
 
       const el = allFiles.html.get(htmlPath);
       el.HtmlDocument = document;
-      el.HtmlContent = bodyEl.innerHTML;
-      el.HtmlHeadContent = headEl.innerHTML; //el.HtmlBody = bodyEl;
-      //el.HtmlHead = headEl;
-
+      el.HtmlBody = bodyEl;
+      el.HtmlHead = headEl;
       el.metaData = {
         docTitle: title
       };
       resolve(el);
     });
   });
+} // remove any HTML DOM elements from the <head> section which would otherwise collide with the standard metadata.
+
+
+function filterHtmlHeadAfterMetadataExtraction(entry) {
+  const document = entry.HtmlDocument;
+  const headEl = document.querySelector('head');
+  const titleEl = headEl == null ? void 0 : headEl.querySelector('title');
+  titleEl == null ? void 0 : titleEl.remove();
 } // compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
 // have been processed as we will be patching some DOM nodes in there before the end is neigh!
 
@@ -1160,10 +1162,8 @@ async function renderHTML(htmlPath, allFiles) {
       body: bodyEl.innerHTML,
       head: headEl.innerHTML
     })); // update the file record:
-
-    el.HtmlContent = bodyEl.innerHTML;
-    el.HtmlHeadContent = headEl.innerHTML; //el.HtmlBody = bodyEl;
-    //el.HtmlHead = headEl;
+    //el.HtmlContent = bodyEl.innerHTML;
+    //el.HtmlHeadContent = headEl.innerHTML;
 
     el.metaData = {
       docTitle: title

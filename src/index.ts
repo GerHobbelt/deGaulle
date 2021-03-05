@@ -42,11 +42,11 @@ interface ResultFileRecord {
 }
 interface ResultHtmlFileRecord extends ResultFileRecord {
   HtmlDocument: any;
-  HtmlContent: string;
+  //HtmlContent: string;
   docTitle: string;
-  HtmlHeadContent: string;
-  //HtmlBody: any;
-  //HtmlHead: any;
+  //HtmlHeadContent: string;
+  HtmlBody: any;              // reference into body part DOM of HtmlDocument
+  HtmlHead: any;              // reference into head part DOM of HtmlDocument
   mdState: any;
   mdEnv: MarkdownItEnvironment;
   mdTypeMap: Set<string>;
@@ -795,6 +795,8 @@ async function buildWebsite(opts, command) {
       emphasis:      readOptionalTxtConfigFile('.deGaulle/abbr-emphasis-phrases.txt')
     },
 
+    attrs: true,
+
     anchor: {
       permalink: true,
       permalinkBefore: true,
@@ -828,11 +830,11 @@ async function buildWebsite(opts, command) {
 
     // [[toc]]
     tableOfContents: false,
-    
+
     // @[toc](Title)
-    toc: true,
+    toc: false,
     // @[toc]               -- no title...
-    tocAndAnchor: false,
+    tocAndAnchor: true,
 
     // ${toc} | [[toc]]     -- but we removed that last version by specifying a custom placeholder here:
     tocDoneRight: {
@@ -1202,14 +1204,18 @@ async function buildWebsite(opts, command) {
           const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
           if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
 
-          let title = entry.docTitle;
+          filterHtmlHeadAfterMetadataExtraction(entry);
+
+          let title = entry.docTitle || path.basename(entry.relativePath, entry.ext);
           if (title && title.trim()) {
             title = `<title>${title}</title>`;
           } else {
             title = '';
           }
-          const miscHeaderContent = entry.HtmlHeadContent || '';
-          const bodyContent = entry.HtmlContent;
+
+          const htmlHead = entry.HtmlHead;
+          const htmlBody = entry.HtmlBody;
+
           const originalPath = entry.relativePath;
 
           const content = `
@@ -1219,11 +1225,11 @@ async function buildWebsite(opts, command) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${ title }
-    ${ miscHeaderContent }
+    ${ htmlHead.innerHTML }
   </head>
   <body>
 
-    ${ bodyContent }
+    ${ htmlBody.innerHTML }
 
     <footer>
       © 2020 Qiqqa Contributors ::
@@ -1236,10 +1242,7 @@ async function buildWebsite(opts, command) {
           const dstDir = unixify(path.dirname(destFilePath));
           fs.mkdirSync(dstDir, { recursive: true });
           fs.writeFileSync(destFilePath, content, 'utf8');
-          //el.HtmlContent = content;
-          //el.HtmlHeadContent = headEl.innerHTML;
-          //el.HtmlBody = bodyEl;
-          //el.HtmlHead = headEl;
+          //el.RenderedHtmlContent = content;
         }
       }
       continue;
@@ -1412,7 +1415,7 @@ async function renderMD(mdPath, md, allFiles) {
 
     if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
 
-    const dom = new JSDOM('<html><head>\n' + content,
+    const dom = new JSDOM('<html><head><body>\n' + content,
       { includeNodeLocations: true }
     );
 
@@ -1421,21 +1424,16 @@ async function renderMD(mdPath, md, allFiles) {
     const headEl = document.querySelector('head');
     if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
 
-        // update the file record:
+    // update the file record:
     if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
     el.HtmlDocument = document;
-    el.HtmlContent = content;
-        //el.HtmlContent = bodyEl.innerHTML;
-    el.HtmlHeadContent = headEl.innerHTML;
-        //el.HtmlBody = bodyEl;
-        //el.HtmlHead = headEl;
+    el.HtmlBody = bodyEl;
+    el.HtmlHead = headEl;
     el.metaData = metadata;
 
     resolve(el);
   });
 }
-
-
 
 
 
@@ -1476,10 +1474,8 @@ async function loadHTML(htmlPath, allFiles) {
         const el = allFiles.html.get(htmlPath);
         el.HtmlDocument = document;
 
-        el.HtmlContent = bodyEl.innerHTML;
-        el.HtmlHeadContent = headEl.innerHTML;
-        //el.HtmlBody = bodyEl;
-        //el.HtmlHead = headEl;
+        el.HtmlBody = bodyEl;
+        el.HtmlHead = headEl;
 
         el.metaData = {
           docTitle: title
@@ -1495,6 +1491,13 @@ async function loadHTML(htmlPath, allFiles) {
 
 
 
+// remove any HTML DOM elements from the <head> section which would otherwise collide with the standard metadata.
+function filterHtmlHeadAfterMetadataExtraction(entry: ResultHtmlFileRecord) {
+  const document = entry.HtmlDocument;
+  const headEl = document.querySelector('head');
+  const titleEl = headEl?.querySelector('title');
+  titleEl?.remove();
+}
 
 
 
@@ -1517,11 +1520,9 @@ async function renderHTML(htmlPath, allFiles) {
 
     if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
 
-        // update the file record:
-    el.HtmlContent = bodyEl.innerHTML;
-    el.HtmlHeadContent = headEl.innerHTML;
-        //el.HtmlBody = bodyEl;
-        //el.HtmlHead = headEl;
+    // update the file record:
+    //el.HtmlContent = bodyEl.innerHTML;
+    //el.HtmlHeadContent = headEl.innerHTML;
 
     el.metaData = {
       docTitle: title
