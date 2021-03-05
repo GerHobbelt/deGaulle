@@ -204,7 +204,7 @@ JS HTTP is a collection of low-level javascript HTTP-related modules. {>>It's aw
 
 ---
 
-Basic example:
+Basic alerts example:
 
 ::: warning
 Hello world! [Link](#).

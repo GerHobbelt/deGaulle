@@ -810,6 +810,10 @@ async function buildWebsite(opts, command) {
     },
     //githubHeadings: false,
 
+    footnote: {
+      atDocumentEnd: false,
+    },
+
     furigana: true,
 
     include: {
@@ -832,9 +836,9 @@ async function buildWebsite(opts, command) {
     tableOfContents: false,
 
     // @[toc](Title)
-    toc: false,
+    toc: true,
     // @[toc]               -- no title...
-    tocAndAnchor: true,
+    tocAndAnchor: false,
 
     // ${toc} | [[toc]]     -- but we removed that last version by specifying a custom placeholder here:
     tocDoneRight: {
