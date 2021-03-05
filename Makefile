@@ -15,7 +15,7 @@ CURR_HEAD   := $(firstword $(shell git show-ref --hash HEAD | cut -b -6) master)
 GITHUB_PROJ := https://github.com//GerHobbelt/${NPM_PACKAGE}
 
 
-build: report-config lintfix bundle test coverage todo 
+build: report-config lintfix bundle test coverage todo doc
 
 lint:
 	eslint .
@@ -96,10 +96,10 @@ report-config:
 	-echo "NPM_PACKAGE=${NPM_PACKAGE} NPM_VERSION=${NPM_VERSION} GLOBAL_NAME=${GLOBAL_NAME} BUNDLE_NAME=${BUNDLE_NAME} TMP_PATH=${TMP_PATH} REMOTE_NAME=${REMOTE_NAME} REMOTE_REPO=${REMOTE_REPO} CURR_HEAD=${CURR_HEAD}"
 
 
-doc: bundle
+doc:
 	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
-	dist/cli.js build docs-src/ --output ./docs/
+	dist/cli.js -d build docs-src/ --output ./docs/
 
 
 .PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile
