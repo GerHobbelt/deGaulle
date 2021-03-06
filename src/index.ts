@@ -1392,6 +1392,11 @@ async function buildWebsite(opts, command) {
 
           const originalPath = entry.relativePath;
 
+          let fm: string = null;
+          if (entry.metaData) {
+            fm = `<pre>${ JSON.stringify(entry.metaData, null, 2) }</pre>`;
+          }
+
           const content = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1405,7 +1410,7 @@ async function buildWebsite(opts, command) {
     ${ htmlHead.html() }
   </head>
   <body>
-    <pre>${ JSON.stringify(entry.metaData, null, 2) }</pre>
+    ${ fm || '' }
 
     ${ htmlBody.html() }
 
