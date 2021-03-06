@@ -4,6 +4,7 @@
 
 import nomnom from '@gerhobbelt/nomnom';
 import slug from '@gerhobbelt/slug';
+import yaml from 'js-yaml';
 
 import MarkDown from '@gerhobbelt/markdown-it';
 
@@ -30,6 +31,10 @@ let DEBUG = 1;
 
 const markdownTokens: Record<string, boolean> = {};
 
+interface MetaDataRecord {
+  docTitle: string;
+  frontMatter: any;
+}
 interface ResultFileRecord {
   path: string;
   nameLC: string;
@@ -42,14 +47,13 @@ interface ResultFileRecord {
 interface ResultHtmlFileRecord extends ResultFileRecord {
   HtmlDocument: cheerio.Root;
   //HtmlContent: string;
-  docTitle: string;
   //HtmlHeadContent: string;
   HtmlBody: cheerio.Cheerio;              // reference into body part DOM of HtmlDocument
   HtmlHead: cheerio.Cheerio;              // reference into head part DOM of HtmlDocument
   mdState: any;
   mdEnv: MarkdownItEnvironment;
   mdTypeMap: Set<string>;
-  metaData: any;
+  metaData: MetaDataRecord;
 }
 type ResultTextAssetFileRecord = ResultFileRecord
 type ResultBinaryAssetFileRecord = ResultFileRecord
@@ -963,12 +967,29 @@ async function buildWebsite(opts, command) {
 
     furigana: true,
 
+    frontMatter: {
+      callback: function (meta, token, state) {
+        try {
+          const doc = yaml.load(meta);
+          token.meta = doc;              // override token.meta with the parsed object
+          console.log("parsed YAML:", doc)
+        } catch (e) {
+          console.log(e);
+          throw;
+        }
+      }
+    },
+
     include: {
       root: '/includes/',
       getRootDir: (options, state, startLine, endLine) => {
         console.log('state:', { state });
         return state.env.getIncludeRootDir(options, state, startLine, endLine);
       }
+    },
+
+    title: {
+      level: 0   // grab the first H1/H2/... that we encounter
     },
 
     wikilinks: {
@@ -1350,14 +1371,16 @@ async function buildWebsite(opts, command) {
       {
         const collection = allFiles[type];
         for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
+          const key: string = slot[0];
+          const entry: ResultHtmlFileRecord = slot[1];
           const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
           if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
 
           filterHtmlHeadAfterMetadataExtraction(entry);
 
-          let title = entry.docTitle || path.basename(entry.relativePath, entry.ext);
+          // re title: frontMatter should have precedence over any derivative, including the title extracted from the document via H1
+          let title = entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || path.basename(entry.relativePath, entry.ext);
+          console.log("TITLE extraction:", { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle: path.basename(entry.relativePath, entry.ext), title });
           if (title && title.trim()) {
             title = `<title>${title}</title>`;
           } else {
@@ -1379,6 +1402,7 @@ async function buildWebsite(opts, command) {
     ${ htmlHead.html() }
   </head>
   <body>
+    <pre>${ JSON.stringify(entry.metaData, null, 2) }</pre>
 
     ${ htmlBody.html() }
 
@@ -1570,7 +1594,7 @@ async function renderMD(mdPath, md, allFiles) {
 
     const bodyEl = $doc('body'); // implicitly created
     const headEl = $doc('head');
-    if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
+    if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: $doc, body: bodyEl.html(), head: headEl.html() }));
 
     // update the file record:
     if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
@@ -1613,11 +1637,11 @@ async function loadHTML(htmlPath, allFiles) {
         const titleEl = headEl.find('title');
         const title = titleEl.html();
 
-        if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
+        if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: $doc, body: bodyEl.html(), head: headEl.html() }));
 
         // update the file record:
         const el = allFiles.html.get(htmlPath);
-        el.HtmlDocument = document;
+        el.HtmlDocument = $doc;
 
         el.HtmlBody = bodyEl;
         el.HtmlHead = headEl;
@@ -1638,8 +1662,8 @@ async function loadHTML(htmlPath, allFiles) {
 
 // remove any HTML DOM elements from the <head> section which would otherwise collide with the standard metadata.
 function filterHtmlHeadAfterMetadataExtraction(entry: ResultHtmlFileRecord) {
-  const $document = entry.HtmlDocument;
-  const headEl = $document('head');
+  const $doc = entry.HtmlDocument;
+  const headEl = $doc('head');
   const titleEl = headEl.find('title');
   titleEl?.remove();
 }
@@ -1657,19 +1681,13 @@ async function renderHTML(htmlPath, allFiles) {
   return new Promise((resolve, reject) => {
     const el = allFiles.html.get(htmlPath);
 
-    const document = el.HtmlDocument;
-    const bodyEl = document.body; // implicitly created
-    const headEl = document.querySelector('head');
-    const titleEl = headEl && headEl.querySelector('title');
-    const title = titleEl && titleEl.html();
+    const $doc = el.HtmlDocument;
+    const bodyEl = el.HtmlBody;
+    const headEl = el.htmlHead;
 
-    if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
+    if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: $doc, body: bodyEl.html(), head: headEl.html() }));
 
     // update the file record:
-
-    el.metaData = {
-      docTitle: title
-    };
 
     resolve(el);
   });

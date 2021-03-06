@@ -1,3 +1,11 @@
+---
+title: Associative arrays
+people:
+    name: John Smith
+    age: 33
+morePeople: { name: Grace Jones, age: 21 }
+---
+
 # Heading: table-of-contents
 
 [[toc]]

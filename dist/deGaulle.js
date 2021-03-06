@@ -2,6 +2,7 @@
 
 import nomnom from '@gerhobbelt/nomnom';
 import slug from '@gerhobbelt/slug';
+import yaml from 'js-yaml';
 import MarkDown from '@gerhobbelt/markdown-it';
 import mdPluginCollective from 'markdown-it-dirty-dozen';
 import { fileURLToPath } from 'url';
@@ -598,6 +599,18 @@ async function buildWebsite(opts, command) {
       atDocumentEnd: false
     },
     furigana: true,
+    frontMatter: {
+      callback: function (meta, token, state) {
+        try {
+          const doc = yaml.load(meta);
+          token.meta = doc; // override token.meta with the parsed object
+
+          console.log("parsed YAML:", doc);
+        } catch (e) {
+          console.log(e);
+        }
+      }
+    },
     include: {
       root: '/includes/',
       getRootDir: (options, state, startLine, endLine) => {
@@ -910,11 +923,19 @@ async function buildWebsite(opts, command) {
           const collection = allFiles[type];
 
           for (const slot of collection) {
+            var _entry$metaData, _entry$metaData2, _entry$metaData2$fron, _entry$metaData3, _entry$metaData4, _entry$metaData4$fron;
             const entry = slot[1];
             const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
             filterHtmlHeadAfterMetadataExtraction(entry);
-            let title = entry.docTitle || path.basename(entry.relativePath, entry.ext);
+            let title = ((_entry$metaData = entry.metaData) == null ? void 0 : _entry$metaData.docTitle) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : (_entry$metaData2$fron = _entry$metaData2.frontMatter) == null ? void 0 : _entry$metaData2$fron.title) || path.basename(entry.relativePath, entry.ext);
+            console.log("TITLE extraction:", {
+              meta: entry.metaData,
+              docTitle: (_entry$metaData3 = entry.metaData) == null ? void 0 : _entry$metaData3.docTitle,
+              fmTitle: (_entry$metaData4 = entry.metaData) == null ? void 0 : (_entry$metaData4$fron = _entry$metaData4.frontMatter) == null ? void 0 : _entry$metaData4$fron.title,
+              pathTitle: path.basename(entry.relativePath, entry.ext),
+              title
+            });
 
             if (title && title.trim()) {
               title = `<title>${title}</title>`;
@@ -935,6 +956,7 @@ async function buildWebsite(opts, command) {
     ${htmlHead.html()}
   </head>
   <body>
+    <pre>${JSON.stringify(entry.metaData, null, 2)}</pre>
 
     ${htmlBody.html()}
 
@@ -1076,7 +1098,7 @@ async function renderMD(mdPath, md, allFiles) {
 
     const headEl = $doc('head');
     if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({
-      html: document,
+      html: $doc,
       body: bodyEl.html(),
       head: headEl.html()
     })); // update the file record:
@@ -1114,13 +1136,13 @@ async function loadHTML(htmlPath, allFiles) {
       const titleEl = headEl.find('title');
       const title = titleEl.html();
       if (DEBUG >= 3) console.log('HTML:\n', showRec({
-        html: document,
+        html: $doc,
         body: bodyEl.html(),
         head: headEl.html()
       })); // update the file record:
 
       const el = allFiles.html.get(htmlPath);
-      el.HtmlDocument = document;
+      el.HtmlDocument = $doc;
       el.HtmlBody = bodyEl;
       el.HtmlHead = headEl;
       el.metaData = {
@@ -1133,8 +1155,8 @@ async function loadHTML(htmlPath, allFiles) {
 
 
 function filterHtmlHeadAfterMetadataExtraction(entry) {
-  const $document = entry.HtmlDocument;
-  const headEl = $document('head');
+  const $doc = entry.HtmlDocument;
+  const headEl = $doc('head');
   const titleEl = headEl.find('title');
   titleEl == null ? void 0 : titleEl.remove();
 } // compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
@@ -1145,21 +1167,15 @@ async function renderHTML(htmlPath, allFiles) {
   if (DEBUG >= 3) console.log(`processing file: ${htmlPath}...`);
   return new Promise((resolve, reject) => {
     const el = allFiles.html.get(htmlPath);
-    const document = el.HtmlDocument;
-    const bodyEl = document.body; // implicitly created
-
-    const headEl = document.querySelector('head');
-    const titleEl = headEl && headEl.querySelector('title');
-    const title = titleEl && titleEl.html();
+    const $doc = el.HtmlDocument;
+    const bodyEl = el.HtmlBody;
+    const headEl = el.htmlHead;
     if (DEBUG >= 3) console.log('HTML:\n', showRec({
-      html: document,
+      html: $doc,
       body: bodyEl.html(),
       head: headEl.html()
     })); // update the file record:
 
-    el.metaData = {
-      docTitle: title
-    };
     resolve(el);
   });
 }
