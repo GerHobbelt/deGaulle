@@ -101,6 +101,11 @@ doc:
 	#npx deGaulle build docs-src/
 	dist/cli.js -d build docs-src/ --output ./docs/
 
+qiqqa:
+	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
+	#npx deGaulle build docs-src/
+	dist/cli.js -d build ../qiqqa/docs-src/ --output ./docs-qiqqa/
 
-.PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile
+
+.PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile qiqqa
 .SILENT: help todo report-config
