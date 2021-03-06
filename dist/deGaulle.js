@@ -5,11 +5,10 @@ import slug from '@gerhobbelt/slug';
 import yaml from 'js-yaml';
 import MarkDown from '@gerhobbelt/markdown-it';
 import mdPluginCollective from 'markdown-it-dirty-dozen';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, URL } from 'url';
 import cheerio from 'cheerio';
 import glob from '@gerhobbelt/glob';
 import assert from 'assert';
-import _ from 'lodash';
 import path from 'path';
 import fs from 'fs';
 
@@ -159,6 +158,18 @@ function showRec(rec) {
   return rec;
 }
 
+function slugify4Path(filePath) {
+  // slugify eeach path element individually so thee '/' path separators don't get munched in the process!
+  let elems = unixify(filePath).split('/');
+  elems = elems.map(el => {
+    const nameslug = slug(el, {
+      mode: 'filename',
+      replacement: '_'
+    });
+  });
+  return elems.join('/');
+}
+
 function slugify4TitleId(title) {
   return slug(title, {
     mode: 'pretty' // or should we use uslug?
@@ -194,30 +205,213 @@ function readOptionalTxtConfigFile(rel) {
   }
 
   return {};
-}
+} // name to path for wiki links
+
 
 function myCustomPageNamePostprocessor(spec) {
   // clean up unwanted characters
   spec = spec.replace(/ :: /g, '/');
   spec = spec.replace(/ --* /g, '/');
-  spec = _.deburr(spec).trim(); // // normalize case
-  //spec = spec.toLowerCase();
-
-  spec = spec.replace(/[^\w\d\s\/_-]/g, '_');
-  spec = spec.replace(/__+/g, '_');
-  spec = spec.replace(/\s+/g, ' ');
-  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 1', spec);
-  spec = spec.replace(/_-_/g, '_');
-  spec = spec.replace(/ - /g, ' ');
-  spec = spec.replace(/[ _]* [ _]*/g, ' ');
-  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 2', spec);
-  spec = spec.replace(/(^|\/)[ _]+/g, '$1');
-  spec = spec.replace(/[ _]+($|\/)/g, '$1');
-  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 3', spec);
-  spec = spec.replace(/ /g, '_');
-  if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 4', spec);
+  spec = slugify4Path(spec);
   return spec;
+} // this assumes `relativeDirPath` is normalized and does not contain ../ path segments anywhere.
+//
+// Returns a ./ or ../.../ path with trailing /
+
+
+function calculateRelativeJumpToBasePath(relativeDirPath) {
+  if (relativeDirPath === '.' || relativeDirPath == null) {
+    relativeDirPath = '';
+  }
+
+  relativeDirPath = relativeDirPath.replace(/\/$/, ''); // remove possible trailing /
+  // count number of directories and generate a ../../../... path occurdingly:
+
+  const destDepthArr = relativeDirPath.split('/');
+  const jumpbackPath = new Array(destDepthArr.length + 1).join('../');
+  return relativeDirPath === '' ? './' : jumpbackPath;
 } // ripped from linkinator and then tweaked: which HTML tag has URLs in which attributes?
+
+
+const linksAttr = {
+  background: ['body'],
+  cite: ['blockquote', 'del', 'ins', 'q'],
+  data: ['object'],
+  href: ['a', 'area', 'embed', 'link'],
+  icon: ['command'],
+  longdesc: ['frame', 'iframe'],
+  manifest: ['html'],
+  content: ['meta'],
+  poster: ['video'],
+  pluginspage: ['embed'],
+  pluginurl: ['embed'],
+  src: ['audio', 'embed', 'frame', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],
+  srcset: ['img', 'source']
+};
+
+function getLinks(document, baseFilePath) {
+  const $ = document;
+  let realBaseUrl;
+  const base = $('base[href]');
+
+  if (base.length) {
+    // only first <base> by specification
+    const htmlBaseUrl = base.first().attr('href');
+    console.log('processing page with <base> tag.', {
+      htmlBaseUrl
+    });
+    realBaseUrl = getBaseUrl(htmlBaseUrl, baseFilePath);
+    console.log('getBaseUrl:', {
+      htmlBaseUrl,
+      baseFilePath,
+      realBaseUrl
+    });
+  } else {
+    realBaseUrl = getBaseUrl('.', baseFilePath);
+    console.log('getBaseUrl:', {
+      dir: '.',
+      baseFilePath,
+      realBaseUrl
+    });
+  }
+
+  const links = new Array();
+  const attrs = Object.keys(linksAttr);
+
+  for (const attr of attrs) {
+    const elements = linksAttr[attr].map(tag => `${tag}[${attr}]`).join(',');
+    $(elements).each((i, ele) => {
+      const element = ele;
+
+      if (!element.attribs) {
+        return;
+      }
+
+      const values = parseAttr(attr, element.attribs[attr]); // ignore href properties for link tags where rel is likely to fail
+
+      const relValuesToIgnore = ['dns-prefetch', 'preconnect'];
+
+      if (element.tagName === 'link' && relValuesToIgnore.includes(element.attribs.rel)) {
+        return;
+      } // Only for <meta content=""> tags, only validate the url if
+      // the content actually looks like a url
+
+
+      if (element.tagName === 'meta' && element.attribs.content) {
+        try {
+          new URL(element.attribs.content);
+        } catch (e) {
+          return;
+        }
+      }
+
+      for (const v of values) {
+        if (v) {
+          const link = parseLink(v, realBaseUrl, element, attr);
+
+          if (!v.startsWith('https://')) {
+            console.log('parseLink:', {
+              v,
+              realBaseUrl,
+              result: link.url
+            });
+          }
+
+          links.push(link);
+        }
+      }
+    });
+  }
+
+  return links;
+}
+
+function getBaseUrl(htmlBaseUrl, oldBaseUrl) {
+  if (isAbsoluteUrl(htmlBaseUrl)) {
+    return htmlBaseUrl;
+  }
+
+  try {
+    const url = new URL(htmlBaseUrl, oldBaseUrl);
+    url.search = '';
+    url.hash = '';
+    return url.href;
+  } catch (ex) {
+    // merge paths:
+    if (!path.isAbsolute(htmlBaseUrl)) {
+      htmlBaseUrl = path.join(oldBaseUrl, htmlBaseUrl);
+
+      if (!path.isAbsolute(htmlBaseUrl)) {
+        htmlBaseUrl = path.join('/', htmlBaseUrl);
+      }
+    } // URL class constructor automatically does URL path normalization:
+    //
+    // http://x.ccom/a/b/c/../d.html --> path: /a/b/d.html
+
+
+    const url = new URL('http://localhost' + unixify(htmlBaseUrl));
+    url.search = '';
+    url.hash = '';
+    return url.href;
+  }
+}
+
+function isAbsoluteUrl(url) {
+  // Don't match Windows paths
+  if (/^[a-zA-Z]:\\/.test(url)) {
+    return false;
+  } // Scheme: https://tools.ietf.org/html/rfc3986#section-3.1
+  // Absolute URL: https://tools.ietf.org/html/rfc3986#section-4.3
+
+
+  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
+}
+
+function parseAttr(name, value) {
+  switch (name) {
+    case 'srcset':
+      return value.split(',').map(pair => pair.trim().split(/\s+/)[0]);
+
+    default:
+      return [value];
+  }
+}
+
+function parseLink(link, baseUrl, node, attr) {
+  // strip off any 'file://' prefix first:
+  if (link.startsWith('file://')) {
+    link = link.slice(7);
+  } // remove Windows drive letters from 'absolute' paths:
+
+
+  link = link.replace(/^\/?[a-zA-Z][:]\//, '');
+
+  try {
+    const url = new URL(link, baseUrl); //url.hash = '';
+
+    return {
+      node,
+      attr,
+      link,
+      url,
+      href: url.href
+    };
+  } catch (error) {
+    console.log('parseLink error', {
+      error,
+      link,
+      baseUrl,
+      attr
+    });
+    return {
+      node,
+      attr,
+      link,
+      error,
+      href: null
+    };
+  }
+}
 
 async function loadConfigScript(configScript) {
   if (configScript) {
@@ -519,6 +713,7 @@ async function buildWebsite(opts, command) {
         ext: ext,
         relativePath: unixify(path.relative(config.docTreeBasedir, f)),
         destinationRelPath: null,
+        relativeJumpToBasePath: null,
         RawContent: null,
         contentIsBinary: rv_mapping_bin_content[ext] || false
       };
@@ -673,7 +868,8 @@ async function buildWebsite(opts, command) {
             const key = slot[0];
             const entry = slot[1]; // as these pages will be rendered to HTML, they'll receive the html extension:
 
-            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
             if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! markdown file record:', showRec(entry));
             const specRec2 = await compileMD(key, md, allFiles);
             if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
@@ -690,7 +886,8 @@ async function buildWebsite(opts, command) {
             const key = slot[0];
             const entry = slot[1]; // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
 
-            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + '.html';
+            entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
             if (DEBUG >= 5) console.log('!!!!!!!!!!!!!!!!!!!!!!!! HTML file record:', showRec(entry));
             const specRec2 = await loadHTML(key, allFiles);
             if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
@@ -707,7 +904,8 @@ async function buildWebsite(opts, command) {
           for (const slot of collection) {
             const key = slot[0];
             const entry = slot[1];
-            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
             const specRec2 = await loadFixedAssetTextFile(key, allFiles, collection);
             if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
@@ -723,7 +921,8 @@ async function buildWebsite(opts, command) {
           for (const slot of collection) {
             const key = slot[0];
             const entry = slot[1];
-            entry.destinationRelPath = myCustomPageNamePostprocessor(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+            entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
             const specRec2 = await loadFixedAssetBinaryFile(key, allFiles, collection);
             if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
@@ -810,6 +1009,12 @@ async function buildWebsite(opts, command) {
           const collection = allFiles[type];
 
           for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+
+            if (key.includes('getsatisfaction-mirror/')) {
+              filterHtmlOfGetsatisfactionPages(entry);
+            }
           }
         }
         continue;
@@ -910,16 +1115,15 @@ async function buildWebsite(opts, command) {
   // Yes, this means we'll have content pages for the 404 and other landing pages too. If they are
   // absent, we do not have those landing pages. Simple as that.
   //
-  // output the files into the destination directory
+  // now render the template and postprocess all links:
 
 
-  console.log(`buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`); // now write the CSS, HTML, JS and other files:
-
-  console.log(`Writing all processed & collected files to the website destination directory '${config.docTreeBasedir}'...`);
+  console.log('Rendering page templates and extracting all internal links for mapping analysis...');
 
   for (const type in allFiles) {
     switch (type) {
       case '_':
+      default:
         continue;
 
       case 'html':
@@ -953,18 +1157,6 @@ async function buildWebsite(opts, command) {
             const htmlHead = entry.HtmlHead;
             const htmlBody = entry.HtmlBody;
             const originalPath = entry.relativePath;
-            let destDepthDir = path.dirname(entry.destinationRelPath);
-            if (destDepthDir === '.') destDepthDir = '';
-            const destDepthArr = destDepthDir.split('/');
-            const jumpbackPath = new Array(destDepthArr.length + 1).join('../');
-            const relativeJumpToBasePath = destDepthDir === '' ? './' : jumpbackPath;
-            console.log('destDepthArr calculus', {
-              outRelPath: entry.destinationRelPath,
-              arrLen: destDepthArr.length,
-              jumpbackPath,
-              destDepthDir,
-              relativeJumpToBasePath
-            });
             let fm = null;
 
             if (entry.metaData) {
@@ -979,7 +1171,7 @@ async function buildWebsite(opts, command) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${title}
     <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
-    <link rel="stylesheet" href="${relativeJumpToBasePath}css/mini-default.css">
+    <link rel="stylesheet" href="${entry.relativeJumpToBasePath}css/mini-default.css">
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     ${htmlHead.html()}
   </head>
@@ -994,18 +1186,88 @@ async function buildWebsite(opts, command) {
     </footer>
   </body>
 </html>
-`.trimLeft();
-            const dstDir = unixify(path.dirname(destFilePath));
-            fs.mkdirSync(dstDir, {
-              recursive: true
+`.trimLeft(); // parse rendered result page and store it for further post-processing:
+
+            const $doc = cheerio.load(content);
+            const bodyEl = $doc('body'); // implicitly created
+
+            const headEl = $doc('head'); // update the file record:
+
+            entry.HtmlDocument = $doc;
+            entry.HtmlBody = bodyEl;
+            entry.HtmlHead = headEl;
+            const linkCollection = getLinks($doc, entry.destinationRelPath);
+            console.log('collected links for postprocessing:', {
+              originalPath,
+              linkCollection
             });
-            fs.writeFileSync(destFilePath, content, 'utf8'); //el.RenderedHtmlContent = content;
+            if (DEBUG >= 3) console.log('update the file record after rendering the template:', {
+              originalPath,
+              entry: showRec(entry)
+            });
           }
         }
         continue;
 
       case 'css':
       case 'js':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+          }
+        }
+        continue;
+    }
+  } // output the files into the destination directory
+
+
+  console.log(`buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(opts, null, 2)}`); // now write the CSS, HTML, JS and other files:
+
+  console.log(`Writing all processed & collected files to the website destination directory '${config.docTreeBasedir}'...`);
+
+  for (const type in allFiles) {
+    switch (type) {
+      case '_':
+        continue;
+
+      case 'html':
+      case 'markdown':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const entry = slot[1];
+            const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
+            const dstDir = unixify(path.dirname(destFilePath));
+            fs.mkdirSync(dstDir, {
+              recursive: true
+            });
+            const content = '<!DOCTYPE html>\n' + entry.HtmlDocument.html();
+            fs.writeFileSync(destFilePath, content, 'utf8');
+          }
+        }
+        continue;
+
+      case 'css':
+      case 'js':
+        {
+          const collection = allFiles[type];
+
+          for (const slot of collection) {
+            const entry = slot[1];
+            const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
+            if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
+            const dstDir = unixify(path.dirname(destFilePath));
+            fs.mkdirSync(dstDir, {
+              recursive: true
+            });
+            fs.writeFileSync(destFilePath, entry.RawContent, 'utf8');
+          }
+        }
+        continue;
+
       default:
         {
           const collection = allFiles[type];
@@ -1193,6 +1455,57 @@ function filterHtmlHeadAfterMetadataExtraction(entry) {
   const headEl = $doc('head');
   const titleEl = headEl.find('title');
   titleEl == null ? void 0 : titleEl.remove();
+}
+
+function filterHtmlOfGetsatisfactionPages(entry) {
+  const $doc = entry.HtmlDocument;
+  const headEl = $doc('head');
+  console.log('getsatis filtering:', {
+    headEl,
+    children: headEl.children()
+  }); // delete all <script> elements anywhere in there:
+
+  $doc('script').remove(); // kill the <base> tag too
+
+  headEl.find('base').remove(); // kill RSS link, etc.
+
+  const metalist = ['type="application/rss+xml"', 'property="fb:admins"', 'name="csrf-param"', 'name="csrf-token"',
+  /*
+  <meta content="website" property="og:type">
+  <meta content="https://getsatisfaction.com/qiqqa/topics/-helloooo" property="og:url">
+  <meta content="https://getsatisfaction.com/assets/question_med.png" property="og:image">
+  <meta content="Qiqqa.com" property="og:site_name">
+   */
+  'property="og:type"', 'property="og:url"', 'property="og:image"', 'property="og:site_name"', // https://api.jquery.com/category/selectors/
+  // kill one of the style sheets at least
+  'href*="assets/employee_tools"'];
+  metalist.forEach(prop => {
+    headEl.find(`[${prop}]`).remove();
+  });
+  headEl.find('link[rel="shortcut icon"]').remove();
+  const kill_list = ['#header_search_topic', 'div[style*="left: -10000px;"]'];
+  kill_list.forEach(prop => {
+    $doc(prop).remove();
+  });
+  const kill_attr_list = ['onclick', 'onmouseover', 'onmouseout'];
+  kill_attr_list.forEach(prop => {
+    $doc(prop).removeAttr(prop);
+  }); // nuke the head comment blocks (old IEE stuff, etc.)
+
+  let node = headEl.children()[0];
+
+  while (node != null) {
+    if (node.type === 'comment') {
+      // HACK: turn this into an empty 'text' node instead!
+      let tn = node; // shut up TypeScript too...
+
+      tn.type = 'text';
+      tn.data = '';
+    }
+
+    node = node.next;
+  } //console.log('getsatis filtering done:', { html: $doc.html(), children: headEl.children(), head: headEl.html() });
+
 } // compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
 // have been processed as we will be patching some DOM nodes in there before the end is neigh!
 
