@@ -162,7 +162,7 @@ function slugify4Path(filePath) {
   // slugify eeach path element individually so thee '/' path separators don't get munched in the process!
   let elems = unixify(filePath).split('/');
   elems = elems.map(el => {
-    const nameslug = slug(el, {
+    return slug(el, {
       mode: 'filename',
       replacement: '_'
     });
@@ -1483,13 +1483,14 @@ function filterHtmlOfGetsatisfactionPages(entry) {
     headEl.find(`[${prop}]`).remove();
   });
   headEl.find('link[rel="shortcut icon"]').remove();
-  const kill_list = ['#header_search_topic', 'div[style*="left: -10000px;"]'];
+  const kill_list = ['#header_search_topic', 'div[style*="left: -10000px;"]', '.crumb_select', // kill all the <style> blobs and CSS loads too:
+  'style', 'link[type="text/css"]', '#overlay', '#followable_dropdown', '#mini_profile'];
   kill_list.forEach(prop => {
     $doc(prop).remove();
   });
   const kill_attr_list = ['onclick', 'onmouseover', 'onmouseout'];
   kill_attr_list.forEach(prop => {
-    $doc(prop).removeAttr(prop);
+    $doc(`[${prop}]`).removeAttr(prop);
   }); // nuke the head comment blocks (old IEE stuff, etc.)
 
   let node = headEl.children()[0];
