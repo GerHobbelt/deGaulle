@@ -9,7 +9,7 @@ import MarkDown from '@gerhobbelt/markdown-it';
 
 import mdPluginCollective from 'markdown-it-dirty-dozen';
 
-import { fileURLToPath } from 'url';
+import { URL, fileURLToPath } from 'url';
 
 // see https://nodejs.org/docs/latest-v13.x/api/esm.html#esm_no_require_exports_module_exports_filename_dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -17,8 +17,7 @@ const __dirname = path.dirname(__filename);
 
 const pkg = JSON.parse(fs.readFileSync(path.normalize(path.join(__dirname, '../package.json')), 'utf8'));
 
-import jsdom from 'jsdom';
-const { JSDOM } = jsdom;
+import cheerio from 'cheerio';
 import glob from '@gerhobbelt/glob';
 import gitignoreParser from '@gerhobbelt/gitignore-parser';
 import assert from 'assert';
@@ -41,12 +40,12 @@ interface ResultFileRecord {
   contentIsBinary: boolean;
 }
 interface ResultHtmlFileRecord extends ResultFileRecord {
-  HtmlDocument: any;
+  HtmlDocument: cheerio.Root;
   //HtmlContent: string;
   docTitle: string;
   //HtmlHeadContent: string;
-  HtmlBody: any;              // reference into body part DOM of HtmlDocument
-  HtmlHead: any;              // reference into head part DOM of HtmlDocument
+  HtmlBody: cheerio.Cheerio;              // reference into body part DOM of HtmlDocument
+  HtmlHead: cheerio.Cheerio;              // reference into head part DOM of HtmlDocument
   mdState: any;
   mdEnv: MarkdownItEnvironment;
   mdTypeMap: Set<string>;
@@ -371,6 +370,154 @@ function myCustomPageNamePostprocessor(spec) {
 
   return spec;
 }
+
+
+
+
+
+
+
+
+
+
+
+// ripped from linkinator and then tweaked: which HTML tag has URLs in which attributes?
+
+const linksAttr = {
+  background: [ 'body' ],
+  cite: [ 'blockquote', 'del', 'ins', 'q' ],
+  data: [ 'object' ],
+  href: [ 'a', 'area', 'embed', 'link' ],
+  icon: [ 'command' ],
+  longdesc: [ 'frame', 'iframe' ],
+  manifest: [ 'html' ],
+  content: [ 'meta' ],
+  poster: [ 'video' ],
+  pluginspage: [ 'embed' ],
+  pluginurl: [ 'embed' ],
+  src: [
+    'audio',
+    'embed',
+    'frame',
+    'iframe',
+    'img',
+    'input',
+    'script',
+    'source',
+    'track',
+    'video'
+  ],
+  srcset: [ 'img', 'source' ]
+} as {[index: string]: string[]};
+
+interface ParsedUrl {
+  node: cheerio.TagElement;
+  attr: string;
+  link: string;
+  error?: Error;
+  url?: URL;
+}
+
+function getLinks(document: cheerio.Root, baseUrl: string): ParsedUrl[] {
+  const $ = document;
+  let realBaseUrl = baseUrl;
+  const base = $('base[href]');
+  if (base.length) {
+    // only first <base> by specification
+    const htmlBaseUrl = base.first().attr('href')!;
+    realBaseUrl = getBaseUrl(htmlBaseUrl, baseUrl);
+  }
+  const links = new Array<ParsedUrl>();
+  const attrs = Object.keys(linksAttr);
+  for (const attr of attrs) {
+    const elements = linksAttr[attr].map(tag => `${tag}[${attr}]`).join(',');
+    $(elements).each((i, ele) => {
+      const element = ele as cheerio.TagElement;
+      if (!element.attribs) {
+        return;
+      }
+      const values = parseAttr(attr, element.attribs[attr]);
+      // ignore href properties for link tags where rel is likely to fail
+      const relValuesToIgnore = [ 'dns-prefetch', 'preconnect' ];
+      if (
+        element.tagName === 'link' &&
+        relValuesToIgnore.includes(element.attribs.rel)
+      ) {
+        return;
+      }
+
+      // Only for <meta content=""> tags, only validate the url if
+      // the content actually looks like a url
+      if (element.tagName === 'meta' && element.attribs.content) {
+        try {
+          new URL(element.attribs.content);
+        } catch (e) {
+          return;
+        }
+      }
+
+      for (const v of values) {
+        if (v) {
+          const link = parseLink(v, realBaseUrl, element, attr);
+          links.push(link);
+        }
+      }
+    });
+  }
+  return links;
+}
+
+function getBaseUrl(htmlBaseUrl: string, oldBaseUrl: string): string {
+  if (isAbsoluteUrl(htmlBaseUrl)) {
+    return htmlBaseUrl;
+  }
+  const url = new URL(htmlBaseUrl, oldBaseUrl);
+  url.hash = '';
+  return url.href;
+}
+
+function isAbsoluteUrl(url: string): boolean {
+  // Don't match Windows paths
+  if (/^[a-zA-Z]:\\/.test(url)) {
+    return false;
+  }
+
+  // Scheme: https://tools.ietf.org/html/rfc3986#section-3.1
+  // Absolute URL: https://tools.ietf.org/html/rfc3986#section-4.3
+  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
+}
+
+function parseAttr(name: string, value: string): string[] {
+  switch (name) {
+  case 'srcset':
+    return value
+        .split(',')
+        .map((pair: string) => pair.trim().split(/\s+/)[0]);
+  default:
+    return [ value ];
+  }
+}
+
+function parseLink(link: string, baseUrl: string, node: cheerio.TagElement, attr: string): ParsedUrl {
+  try {
+    const url = new URL(link, baseUrl);
+    url.hash = '';
+    return { node, attr, link, url };
+  } catch (error) {
+    return { node, attr, link, error };
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -811,7 +958,7 @@ async function buildWebsite(opts, command) {
     //githubHeadings: false,
 
     footnote: {
-      atDocumentEnd: false,
+      atDocumentEnd: false
     },
 
     furigana: true,
@@ -1229,11 +1376,11 @@ async function buildWebsite(opts, command) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${ title }
-    ${ htmlHead.innerHTML }
+    ${ htmlHead.html() }
   </head>
   <body>
 
-    ${ htmlBody.innerHTML }
+    ${ htmlBody.html() }
 
     <footer>
       © 2020 Qiqqa Contributors ::
@@ -1419,18 +1566,15 @@ async function renderMD(mdPath, md, allFiles) {
 
     if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
 
-    const dom = new JSDOM('<html><head><body>\n' + content,
-      { includeNodeLocations: true }
-    );
+    const $doc = cheerio.load('<html><head><body>\n' + content);
 
-    const document = dom.window.document;
-    const bodyEl = document.body; // implicitly created
-    const headEl = document.querySelector('head');
-    if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
+    const bodyEl = $doc('body'); // implicitly created
+    const headEl = $doc('head');
+    if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
 
     // update the file record:
     if (DEBUG >= 3) console.log('update the file record:', { mdPath, el: showRec(el) });
-    el.HtmlDocument = document;
+    el.HtmlDocument = $doc;
     el.HtmlBody = bodyEl;
     el.HtmlHead = headEl;
     el.metaData = metadata;
@@ -1462,17 +1606,14 @@ async function loadHTML(htmlPath, allFiles) {
 
         if (DEBUG >= 8) console.log(`source: length: ${data.length}`);
 
-        const dom = new JSDOM(data,
-          { includeNodeLocations: true }
-        );
+        const $doc = cheerio.load(data);
 
-        const document = dom.window.document;
-        const bodyEl = document.body; // implicitly created
-        const headEl = document.querySelector('head');
-        const titleEl = headEl && headEl.querySelector('title');
-        const title = titleEl && titleEl.innerHTML;
+        const bodyEl = $doc('body'); // implicitly created
+        const headEl = $doc('head');
+        const titleEl = headEl.find('title');
+        const title = titleEl.html();
 
-        if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
+        if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
 
         // update the file record:
         const el = allFiles.html.get(htmlPath);
@@ -1497,9 +1638,9 @@ async function loadHTML(htmlPath, allFiles) {
 
 // remove any HTML DOM elements from the <head> section which would otherwise collide with the standard metadata.
 function filterHtmlHeadAfterMetadataExtraction(entry: ResultHtmlFileRecord) {
-  const document = entry.HtmlDocument;
-  const headEl = document.querySelector('head');
-  const titleEl = headEl?.querySelector('title');
+  const $document = entry.HtmlDocument;
+  const headEl = $document('head');
+  const titleEl = headEl.find('title');
   titleEl?.remove();
 }
 
@@ -1520,13 +1661,11 @@ async function renderHTML(htmlPath, allFiles) {
     const bodyEl = document.body; // implicitly created
     const headEl = document.querySelector('head');
     const titleEl = headEl && headEl.querySelector('title');
-    const title = titleEl && titleEl.innerHTML;
+    const title = titleEl && titleEl.html();
 
-    if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.innerHTML, head: headEl.innerHTML }));
+    if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: document, body: bodyEl.html(), head: headEl.html() }));
 
     // update the file record:
-    //el.HtmlContent = bodyEl.innerHTML;
-    //el.HtmlHeadContent = headEl.innerHTML;
 
     el.metaData = {
       docTitle: title

@@ -5,7 +5,7 @@ import slug from '@gerhobbelt/slug';
 import MarkDown from '@gerhobbelt/markdown-it';
 import mdPluginCollective from 'markdown-it-dirty-dozen';
 import { fileURLToPath } from 'url';
-import jsdom from 'jsdom';
+import cheerio from 'cheerio';
 import glob from '@gerhobbelt/glob';
 import assert from 'assert';
 import _ from 'lodash';
@@ -19,9 +19,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const pkg = JSON.parse(fs.readFileSync(path.normalize(path.join(__dirname, '../package.json')), 'utf8'));
-const {
-  JSDOM
-} = jsdom;
 let DEBUG = 1;
 const markdownTokens = {};
 const config = {
@@ -219,7 +216,7 @@ function myCustomPageNamePostprocessor(spec) {
   spec = spec.replace(/ /g, '_');
   if (DEBUG >= 7) console.log('myCustomPageNamePostprocessor STAGE 4', spec);
   return spec;
-}
+} // ripped from linkinator and then tweaked: which HTML tag has URLs in which attributes?
 
 async function loadConfigScript(configScript) {
   if (configScript) {
@@ -935,11 +932,11 @@ async function buildWebsite(opts, command) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${title}
-    ${htmlHead.innerHTML}
+    ${htmlHead.html()}
   </head>
   <body>
 
-    ${htmlBody.innerHTML}
+    ${htmlBody.html()}
 
     <footer>
       © 2020 Qiqqa Contributors ::
@@ -1074,24 +1071,21 @@ async function renderMD(mdPath, md, allFiles) {
     const tokens = state.tokens;
     const content = md.renderer.render(tokens, md.options, env);
     if (DEBUG >= 4) console.log('output:\n', limitDebugOutput(content));
-    const dom = new JSDOM('<html><head><body>\n' + content, {
-      includeNodeLocations: true
-    });
-    const document = dom.window.document;
-    const bodyEl = document.body; // implicitly created
+    const $doc = cheerio.load('<html><head><body>\n' + content);
+    const bodyEl = $doc('body'); // implicitly created
 
-    const headEl = document.querySelector('head');
+    const headEl = $doc('head');
     if (DEBUG >= 5) console.log('MARKDOWN:\n', showRec({
       html: document,
-      body: bodyEl.innerHTML,
-      head: headEl.innerHTML
+      body: bodyEl.html(),
+      head: headEl.html()
     })); // update the file record:
 
     if (DEBUG >= 3) console.log('update the file record:', {
       mdPath,
       el: showRec(el)
     });
-    el.HtmlDocument = document;
+    el.HtmlDocument = $doc;
     el.HtmlBody = bodyEl;
     el.HtmlHead = headEl;
     el.metaData = metadata;
@@ -1113,19 +1107,16 @@ async function loadHTML(htmlPath, allFiles) {
       }
 
       if (DEBUG >= 8) console.log(`source: length: ${data.length}`);
-      const dom = new JSDOM(data, {
-        includeNodeLocations: true
-      });
-      const document = dom.window.document;
-      const bodyEl = document.body; // implicitly created
+      const $doc = cheerio.load(data);
+      const bodyEl = $doc('body'); // implicitly created
 
-      const headEl = document.querySelector('head');
-      const titleEl = headEl && headEl.querySelector('title');
-      const title = titleEl && titleEl.innerHTML;
+      const headEl = $doc('head');
+      const titleEl = headEl.find('title');
+      const title = titleEl.html();
       if (DEBUG >= 3) console.log('HTML:\n', showRec({
         html: document,
-        body: bodyEl.innerHTML,
-        head: headEl.innerHTML
+        body: bodyEl.html(),
+        head: headEl.html()
       })); // update the file record:
 
       const el = allFiles.html.get(htmlPath);
@@ -1142,9 +1133,9 @@ async function loadHTML(htmlPath, allFiles) {
 
 
 function filterHtmlHeadAfterMetadataExtraction(entry) {
-  const document = entry.HtmlDocument;
-  const headEl = document.querySelector('head');
-  const titleEl = headEl == null ? void 0 : headEl.querySelector('title');
+  const $document = entry.HtmlDocument;
+  const headEl = $document('head');
+  const titleEl = headEl.find('title');
   titleEl == null ? void 0 : titleEl.remove();
 } // compile the HTML files to a DOM token stream. Belay *rendering* until all files, including the MarkDown files out there,
 // have been processed as we will be patching some DOM nodes in there before the end is neigh!
@@ -1159,14 +1150,12 @@ async function renderHTML(htmlPath, allFiles) {
 
     const headEl = document.querySelector('head');
     const titleEl = headEl && headEl.querySelector('title');
-    const title = titleEl && titleEl.innerHTML;
+    const title = titleEl && titleEl.html();
     if (DEBUG >= 3) console.log('HTML:\n', showRec({
       html: document,
-      body: bodyEl.innerHTML,
-      head: headEl.innerHTML
+      body: bodyEl.html(),
+      head: headEl.html()
     })); // update the file record:
-    //el.HtmlContent = bodyEl.innerHTML;
-    //el.HtmlHeadContent = headEl.innerHTML;
 
     el.metaData = {
       docTitle: title
