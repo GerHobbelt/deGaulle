@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README</title>
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
+    <link rel="stylesheet" href="./css/mini-default.css">
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    
+  </head>
+  <body>
+    <pre>{
+  "frontMatter": null,
+  "docTitle": null
+}</pre>
+
+    
+<h1><a id="deGaulle"></a><a class="header-anchor" href="#deGaulle">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> deGaulle</h1>
+<p>Static Site Generator (SSG) with attitude, control and verification too.</p>
+<h2><a id="Usage"></a><a class="header-anchor" href="#Usage">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> Usage</h2>
+<pre class="language-sh"><code class="language-sh">npm i deGaulle
+deGaulle config
+deGaulle build
+deGaulle watch
+</code></pre>
+<p>See <a href="http://degaulle.hebbut.net/">the documenation at deGaulle.hebbut.net</a> for details how to configure and use <em>deGaulle</em>.</p>
+<h2><a id="Whats_it_good_for"></a><a class="header-anchor" href="#Whats-it-good-for">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> What’s it good for?</h2>
+<p>When you want some guarantees while writing your website pages, <em>deGaulle</em> will help out.</p>
+<p>You write your website in MarkDown and possible some HTML. Nothing new there. <em>Mon Général</em>, however, makes sure you’ve got everything covered. He takes one (or more) entry points (which you supply to him) into the site and makes absolutely bloody sure all the pages you wrote are <strong>reachable</strong> from at least one of those entry points.</p>
+<p>Anything that’s <em>unreachable</em> from those entry points will get listed.</p>
+<p>Also, <em>deGaulle</em> will help out in rewriting all the <abbr title="[object Object]">links</abbr> in your generated pages to ensure your source references (as you wrote them in your MarkDown articles) will translate properly to the final website, whether you use simple or complicated page naming schemes, whether it’s a “permalink”, “immutable content” or other URI production style.</p>
+<h2><a id="Goals"></a><a class="header-anchor" href="#Goals">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> Goals</h2>
+<ul>
+<li>
+<p>produce websites which are SEO friendly, fully static where they can be. <em>Totally google-able, I must be.</em></p>
+</li>
+<li>
+<p>produce websites which require as little maintenance &amp; anti-hacker supervision as possible: if <em>you</em> don’t want JavaScript in the result, <em>deGaulle</em> is your man.</p>
+<blockquote>
+<p>If you wish to inject client-side code, be my guest, but know that we can do without. The goal is to keep the total attack surface as lean &amp; mean as possible. Once published, your attention should be focused <em>elsewhere</em>, until the next site update!</p>
+</blockquote>
+</li>
+<li>
+<p>no “opinionated” source directory layout, thank you very much.</p>
+<p>Your tooling should help you to <strong>Write First, Organize Later</strong> and therefor <em>not</em> force you into having to consider the <em>organization</em> of your documents while you write them. (<a href="https://erikwinter.nl/articles/2020/why-i-built-my-own-shitty-static-site-generator/">https://erikwinter.nl/articles/2020/why-i-built-my-own-shitty-static-site-generator/</a> struck a chord with me!)</p>
+<p><code>deGaulle</code> should be able to follow the <abbr title="[object Object]">links</abbr> in your docs and extract the site <em>structure</em> from that data, enabling you to go in later and (re-)organize your documents on disk the way you see fit. (<a href="https://www.youtube.com/playlist?list=PLYwcgf10C65HG0xmaF31c7YiUTGWXpKff">https://www.youtube.com/playlist?list=PLYwcgf10C65HG0xmaF31c7YiUTGWXpKff</a> - after all, you <em>will</em> need to write those thoughts of yours to help you get organized and <em>then</em> write for <em>readers</em>.)</p>
+</li>
+<li>
+<p>scan a directory tree and process everything in there. Userland code/config will tell us what to do with each, when defaults for type don’t suffice.</p>
+<blockquote>
+<p>Technically, I want something of a wildcarded <a href="https://www.npmjs.com/package/glob"><code>glob</code></a> scan of the entire kaboodle and then userland filters can decide what to do, if the <em>deGaulle</em> doesn’t already do what you want by default.</p>
+</blockquote>
+</li>
+<li>
+<p>verify reachability and report any “dangling items” (which Google won’t be able to find easily)</p>
+</li>
+<li>
+<p>find and report all site-internal “unconnected <abbr title="[object Object]">links</abbr>” (which will produce a 404 in production)</p>
+</li>
+<li>
+<p>provide an easy means to <em>map</em> source paths to target URIs using userland code: the user must have total flexibility in naming.</p>
+<ul>
+<li>
+<p>include duplicate/collision checks and a resolve mechanism</p>
+</li>
+<li>
+<p><em>rewrite</em> all <abbr title="[object Object]">links</abbr> in the generated HTML, SVG, CSS, etc.</p>
+<blockquote>
+<p>Let me elaborate on this one: when you use MarkDown or any other to-HTML transpiler for your materials, these tools will always apply a default transformation for the <abbr title="[object Object]">links</abbr> in your material. (E.g. converting any <code>'file.md</code> reference to <code>file.html</code>)</p>
+<p><em>deGaulle</em> will seek out all <abbr title="[object Object]">links</abbr> in these transpiled results and <em>map</em> them onto the target URIs as produced by your userland URI mapper.</p>
+<p>This way the entire transpiler process can use any external library (<code>markdown-it</code>, etc.) and/or template engine and not have to bother with patching every one of those tools: not all of them will have the required flexibility in their plugins anyway.</p>
+</blockquote>
+</li>
+</ul>
+</li>
+<li>
+<p>use JavaScript String Templates as the ‘template engine of choice’. In fact, each template is a JS module.</p>
+<blockquote>
+<p>After all, this is the most powerful and flexible – and completely native to JS – template engine available.</p>
+</blockquote>
+</li>
+<li>
+<p>ability to produce multiple output files from single source (and vice versa).</p>
+<blockquote>
+<p>This is <em>not</em> simply “pagination”: one of the targets is a networked tutorial where one file could potentially produce a large <em>graph</em> of interconnected pages. Think <strong>interactive storytelling</strong>.</p>
+</blockquote>
+</li>
+</ul>
+<h2><a id="Causation"></a><a class="header-anchor" href="#Causation">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> Causation</h2>
+<p>I tried several SSGs, including such different animals as vuepress, wintersmith and eleventy, but ultimately the problem with each is that, in order to achive my goals, I had to dig down <em>deep</em> into the core of those frameworks/generators and was loosing quite a bit of time while the results were… sub-par at best.</p>
+<blockquote>
+<p>Quite possibly some large chunks of this work can be imported into eleventy (which came closest to what I’d like). When the time comes, we’ll see if that’s an option.</p>
+</blockquote>
+<h3><a id="NIH_yall"></a><a class="header-anchor" href="#NIH-yall">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> NIH, y’all?</h3>
+<p>Given the Goals set above, this sounds a lot like a redo of eleventy (with some particular sprinkles on top), and unfortunately it is. But after spending some serious time with eleventy, I think I will be faster rolling my own than hacking in the internals of eleventy as that one has flexibilities and consequent code complexities that I don’t want or need: <em>deGaulle</em> is not targeting <strong>site migration</strong> but is primarily aimed at <strong>new site construction</strong>. If <em>deGaulle</em> is useful for migrating another site, that’s nice, but only a happy coincidence.</p>
+<h2><a id="Technology"></a><a class="header-anchor" href="#Technology">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> Technology</h2>
+<h3><a id="MarkDown_markdownit"></a><a class="header-anchor" href="#MarkDown-markdown-it">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> MarkDown? <code>markdown-it</code>!</h3>
+<p>The most important component will be the MarkDown transpiler. <code>markdown-it</code> is my all-time favorite. Added benefit for me there is that it can be augmented to a feature set that has almost anything you can dream up.</p>
+<h3><a id="Eleventy_Geeking_out_on_async_ES62015"></a><a class="header-anchor" href="#Eleventy-Geeking-out-on-async-ES6-2015">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> Eleventy? Geeking out on <code>async</code>? ES6/2015+?</h3>
+<h3><a id="And_the_template_Engine"></a><a class="header-anchor" href="#And-the-template-Engine">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> And the template Engine…?</h3>
+<p>As this is going to be a tool that’s quite similar to eleventy, do we also go “async all the way”? Maybe, when the need arises, but this is not a latest-JS-language-features-testbed but a tool that should deliver usable output ASAP, while I believe most of the ‘async’ in eleventy is there to allow for flexibility in what you jack into it for a template engine, source provider, etc., which is not a flexibility that I seek with <em>deGaulle</em>: it’s <code>markdown-it</code> and Javascript Modules/Template Strings for now and given my previous use of various template libraries in JavaScript, I don’t see any pressing need to use those, now that JavaScript Template Strings are totally mainstream and supported by all modern NodeJS and browser incantations.</p>
+<h3><a id="SPA_SSR_Insert_BuzzAcronym_here_"></a><a class="header-anchor" href="#SPA-SSR-less-Insert-BuzzAcronym-here-greater">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> SPA? SSR? &lt;Insert BuzzAcronym here /&gt;</h3>
+<p>Oh, and do we get an SPA, like you would with the likes of <code>vuepress</code>? Let me quote <em>mon Général</em> on that: <strong>“Non!”</strong></p>
+<p>If you want an SPA with added SEO friendliness, you can checkout vuepress, but I specifically abandoned that one as it produces a shitload of JavaScript that I don’t want or need: I’m not looking for hipster creds either here: <em>deGaulle</em> is a conservative bugger which produces sites that <em>work</em> and which are <em>simple</em> in their execution:</p>
+<h3><a id="SASS_Stylus_LESS_PostCSS"></a><a class="header-anchor" href="#SASS-Stylus-LESS-PostCSS">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> SASS? Stylus? LESS? PostCSS?</h3>
+<p>Re CSS we are not so sure yet. While I personally like LESS, SASS is the one with the largest market share. Meanwhile I cringle when <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties">CSS3 variables</a> appear, because it feels the committee has been hard at work to work around existing libraries (SASS, LESS) and make it all “interoperable”. Of course it’s not OSS politically safe or survivable to come up with something that blows one or two of the major buggers out of the water, but what the heck?! A <code>--</code> prefix? That one has a track record of nearly <strong>50! yes! <em>fifty</em> years</strong> of “pre-decrement operator” to it, without interruption, right into current-day JavaScript and plenty elsewhere too. Cripes! Cognitive dissonance is my share every time I look at one! <a href="https://www.w3.org/Style/CSS/members">Thank you, my W3C CSS3 heroes!</a></p>
+<p><em>*Okay…*</em></p>
+<p>So what about <a href="https://ashleynolan.co.uk/blog/postcss-a-review">doing it with PostCSS</a> (which is what a lot of others use, including and beyond the very handy ‘autoprefixer’)? SASS + PostCSS maybe? <a href="https://css-tricks.com/from-sass-to-postcss/">Or some transitional form of that?</a></p>
+<p>At the time of this writing, the decision is “inconclusive”. Anyway, there’s several SASS/Stylus/LESS loaders for PostCSS, so that’s probably going to be our route as well.</p>
+<h2><a id="For_deGaulle_Developers"></a><a class="header-anchor" href="#For-deGaulle-Developers">
+        <svg class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true">
+          <path fill-rule="evenodd" d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path>
+        </svg></a> For deGaulle Developers</h2>
+<ul>
+<li>
+<p><code>git clone</code></p>
+</li>
+<li>
+<p><code>npm -i</code></p>
+</li>
+<li>
+<p><code>npm link</code> – this will “install” deGaulle as a local command so you can run it as easily as any user</p>
+</li>
+<li>
+<p><em>do what you gotta do</em></p>
+<p>And choose any of these when you feel the need:</p>
+<ul>
+<li><code>npm run build</code></li>
+<li><code>npm test</code>         – if all you want to do now is run the tests</li>
+<li><code>npm run format</code>   – that’s <code>prettier</code> without the linting. Handy when your code isn’t all shipshape yet.</li>
+<li><code>npm run prettier</code></li>
+</ul>
+</li>
+<li>
+<p><code>git commit</code></p>
+</li>
+<li>
+<p><code>git push</code></p>
+</li>
+<li>
+<p>(if you want to publish as / update the package) <code>npm run pub</code></p>
+</li>
+</ul>
+<p>bloa bla <a href="http://example.com">http://example.com</a> en dan is er nog de <a href="interne-link">interne link</a>… en <a href="pad1/pad2/interne-link">met pad er bij</a> ziet dat er zo uit <a href="./pad1/interne-link">als er puntjes in zitten</a>.</p>
+<p>Wiki-style link <a href="./goes_here_with_spaces_in_it.html">goes here with spaces in it</a>. En hier <a href="./zonder.html">zonder</a>.</p>
+<p>Maar we hebben ze ook in varianten die in een (sub)directory terecht komen en <em>dus</em> hun plaatjes, etc. mee moeten slepen om broken <abbr title="[object Object]">links</abbr> te voorkomen:</p>
+<ul>
+<li><a href="./Ali/Baba/en_de_40_rovers.html">Ali :: Baba :: en de 40 rovers!</a></li>
+<li><a href="./t_is_geen_doen/zoveel_te_doen.html">'t is geen doen - zoveel te doen</a></li>
+<li><img src="assets/19rublev.jpg" alt="en dan een plaat..."></li>
+</ul>
+
+
+    <footer>
+      © 2020 Qiqqa Contributors ::
+      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/docs-src/README.md">Edit this page on GitHub</a>
+    </footer>
+  </body>
+</html>

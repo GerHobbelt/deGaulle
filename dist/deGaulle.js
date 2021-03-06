@@ -606,8 +606,9 @@ async function buildWebsite(opts, command) {
           token.meta = doc; // override token.meta with the parsed object
 
           console.log("parsed YAML:", doc);
-        } catch (e) {
-          console.log(e);
+        } catch (ex) {
+          console.error("error parsing frontmatter YAML:", ex);
+          throw ex;
         }
       }
     },
@@ -619,6 +620,10 @@ async function buildWebsite(opts, command) {
         });
         return state.env.getIncludeRootDir(options, state, startLine, endLine);
       }
+    },
+    title: {
+      level: 0 // grab the first H1/H2/... that we encounter
+
     },
     wikilinks: {
       postProcessPageName: function (pageName) {
@@ -923,12 +928,13 @@ async function buildWebsite(opts, command) {
           const collection = allFiles[type];
 
           for (const slot of collection) {
-            var _entry$metaData, _entry$metaData2, _entry$metaData2$fron, _entry$metaData3, _entry$metaData4, _entry$metaData4$fron;
+            var _entry$metaData, _entry$metaData$front, _entry$metaData2, _entry$metaData3, _entry$metaData4, _entry$metaData4$fron;
             const entry = slot[1];
             const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
-            filterHtmlHeadAfterMetadataExtraction(entry);
-            let title = ((_entry$metaData = entry.metaData) == null ? void 0 : _entry$metaData.docTitle) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : (_entry$metaData2$fron = _entry$metaData2.frontMatter) == null ? void 0 : _entry$metaData2$fron.title) || path.basename(entry.relativePath, entry.ext);
+            filterHtmlHeadAfterMetadataExtraction(entry); // re title: frontMatter should have precedence over any derivative, including the title extracted from the document via H1
+
+            let title = ((_entry$metaData = entry.metaData) == null ? void 0 : (_entry$metaData$front = _entry$metaData.frontMatter) == null ? void 0 : _entry$metaData$front.title) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : _entry$metaData2.docTitle) || path.basename(entry.relativePath, entry.ext);
             console.log("TITLE extraction:", {
               meta: entry.metaData,
               docTitle: (_entry$metaData3 = entry.metaData) == null ? void 0 : _entry$metaData3.docTitle,
@@ -947,12 +953,15 @@ async function buildWebsite(opts, command) {
             const htmlBody = entry.HtmlBody;
             const originalPath = entry.relativePath;
             const content = `
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${title}
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
+    <link rel="stylesheet" href="./css/mini-default.css">
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     ${htmlHead.html()}
   </head>
   <body>

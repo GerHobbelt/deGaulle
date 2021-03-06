@@ -973,9 +973,9 @@ async function buildWebsite(opts, command) {
           const doc = yaml.load(meta);
           token.meta = doc;              // override token.meta with the parsed object
           console.log("parsed YAML:", doc)
-        } catch (e) {
-          console.log(e);
-          throw;
+        } catch (ex) {
+          console.error("error parsing frontmatter YAML:", ex);
+          throw ex;
         }
       }
     },
@@ -1393,12 +1393,15 @@ async function buildWebsite(opts, command) {
           const originalPath = entry.relativePath;
 
           const content = `
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${ title }
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
+    <link rel="stylesheet" href="./css/mini-default.css">
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     ${ htmlHead.html() }
   </head>
   <body>
