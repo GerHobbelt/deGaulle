@@ -972,9 +972,9 @@ async function buildWebsite(opts, command) {
         try {
           const doc = yaml.load(meta);
           token.meta = doc;              // override token.meta with the parsed object
-          console.log("parsed YAML:", doc)
+          console.log('parsed YAML:', doc);
         } catch (ex) {
-          console.error("error parsing frontmatter YAML:", ex);
+          console.error('error parsing frontmatter YAML:', ex);
           throw ex;
         }
       }
@@ -1380,7 +1380,7 @@ async function buildWebsite(opts, command) {
 
           // re title: frontMatter should have precedence over any derivative, including the title extracted from the document via H1
           let title = entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || path.basename(entry.relativePath, entry.ext);
-          console.log("TITLE extraction:", { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle: path.basename(entry.relativePath, entry.ext), title });
+          console.log('TITLE extraction:', { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle: path.basename(entry.relativePath, entry.ext), title });
           if (title && title.trim()) {
             title = `<title>${title}</title>`;
           } else {
