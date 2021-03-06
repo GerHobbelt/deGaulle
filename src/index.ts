@@ -1394,7 +1394,13 @@ async function buildWebsite(opts, command) {
 
           const originalPath = entry.relativePath;
 
-          const relativeJumpToBasePath = '.';
+          let destDepthDir = path.dirname(entry.destinationRelPath);
+          if (destDepthDir === '.')
+            destDepthDir = '';
+          const destDepthArr = destDepthDir.split('/');
+          const jumpbackPath = (new Array(destDepthArr.length + 1)).join('../');
+          const relativeJumpToBasePath = (destDepthDir === '' ? './' : jumpbackPath);
+          console.log('destDepthArr calculus', { outRelPath: entry.destinationRelPath, arrLen: destDepthArr.length, jumpbackPath, destDepthDir, relativeJumpToBasePath  })
 
           let fm: string = null;
           if (entry.metaData) {
@@ -1409,7 +1415,7 @@ async function buildWebsite(opts, command) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${ title }
     <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
-    <link rel="stylesheet" href="${relativeJumpToBasePath}/css/mini-default.css">
+    <link rel="stylesheet" href="${relativeJumpToBasePath}css/mini-default.css">
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     ${ htmlHead.html() }
   </head>
