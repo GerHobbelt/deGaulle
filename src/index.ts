@@ -1378,10 +1378,12 @@ async function buildWebsite(opts, command) {
 
           filterHtmlHeadAfterMetadataExtraction(entry);
 
-          // re title: frontMatter should have precedence over any derivative, including the title extracted from the document via H1
-          let title = entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || path.basename(entry.relativePath, entry.ext);
-          console.log('TITLE extraction:', { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle: path.basename(entry.relativePath, entry.ext), title });
-          if (title && title.trim()) {
+          // re title: frontMatter should have precedence over any other title source, including the title extracted from the document via H1
+          const pathTitle = path.basename(entry.relativePath, entry.ext).replace(/(?:^|\b)[-_](?:\b|$)/g, ' ');
+          let title = (entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || pathTitle)
+          .trim();
+          console.log('TITLE extraction:', { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle, title });
+          if (title) {
             title = `<title>${title}</title>`;
           } else {
             title = '';
@@ -1391,6 +1393,8 @@ async function buildWebsite(opts, command) {
           const htmlBody = entry.HtmlBody;
 
           const originalPath = entry.relativePath;
+
+          const relativeJumpToBasePath = '.';
 
           let fm: string = null;
           if (entry.metaData) {
@@ -1405,7 +1409,7 @@ async function buildWebsite(opts, command) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     ${ title }
     <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
-    <link rel="stylesheet" href="./css/mini-default.css">
+    <link rel="stylesheet" href="${relativeJumpToBasePath}/css/mini-default.css">
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     ${ htmlHead.html() }
   </head>
@@ -1548,10 +1552,9 @@ async function compileMD(mdPath, md, allFiles) {
           });
         }
 
-        if (!env.title) {
-          metadata.docTitle = env.title;
+        if (env.title) {
+          metadata.docTitle = env.title.trim();
         }
-
 
         // update the file record:
         const el = allFiles.markdown.get(mdPath);
@@ -1643,7 +1646,7 @@ async function loadHTML(htmlPath, allFiles) {
         const bodyEl = $doc('body'); // implicitly created
         const headEl = $doc('head');
         const titleEl = headEl.find('title');
-        const title = titleEl.html();
+        const title = titleEl.html()?.trim();
 
         if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: $doc, body: bodyEl.html(), head: headEl.html() }));
 
@@ -1654,9 +1657,11 @@ async function loadHTML(htmlPath, allFiles) {
         el.HtmlBody = bodyEl;
         el.HtmlHead = headEl;
 
-        el.metaData = {
-          docTitle: title
-        };
+        if (title) {
+          el.metaData = {
+            docTitle: title
+          };
+        }
 
         resolve(el);
       }

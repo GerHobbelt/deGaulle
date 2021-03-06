@@ -932,18 +932,19 @@ async function buildWebsite(opts, command) {
             const entry = slot[1];
             const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
-            filterHtmlHeadAfterMetadataExtraction(entry); // re title: frontMatter should have precedence over any derivative, including the title extracted from the document via H1
+            filterHtmlHeadAfterMetadataExtraction(entry); // re title: frontMatter should have precedence over any other title source, including the title extracted from the document via H1
 
-            let title = ((_entry$metaData = entry.metaData) == null ? void 0 : (_entry$metaData$front = _entry$metaData.frontMatter) == null ? void 0 : _entry$metaData$front.title) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : _entry$metaData2.docTitle) || path.basename(entry.relativePath, entry.ext);
+            const pathTitle = path.basename(entry.relativePath, entry.ext).replace(/(?:^|\b)[-_](?:\b|$)/g, ' ');
+            let title = (((_entry$metaData = entry.metaData) == null ? void 0 : (_entry$metaData$front = _entry$metaData.frontMatter) == null ? void 0 : _entry$metaData$front.title) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : _entry$metaData2.docTitle) || pathTitle).trim();
             console.log('TITLE extraction:', {
               meta: entry.metaData,
               docTitle: (_entry$metaData3 = entry.metaData) == null ? void 0 : _entry$metaData3.docTitle,
               fmTitle: (_entry$metaData4 = entry.metaData) == null ? void 0 : (_entry$metaData4$fron = _entry$metaData4.frontMatter) == null ? void 0 : _entry$metaData4$fron.title,
-              pathTitle: path.basename(entry.relativePath, entry.ext),
+              pathTitle,
               title
             });
 
-            if (title && title.trim()) {
+            if (title) {
               title = `<title>${title}</title>`;
             } else {
               title = '';
@@ -1077,8 +1078,8 @@ async function compileMD(mdPath, md, allFiles) {
       });
       if (DEBUG >= 4) console.log('token types:', typeMap);
 
-      if (!env.title) {
-        metadata.docTitle = env.title;
+      if (env.title) {
+        metadata.docTitle = env.title.trim();
       } // update the file record:
 
 
@@ -1138,6 +1139,8 @@ async function loadHTML(htmlPath, allFiles) {
     fs.readFile(htmlPath, {
       encoding: 'utf8'
     }, async (err, data) => {
+      var _titleEl$html;
+
       if (err) {
         reject(new Error(`ERROR: read error ${err} for file ${htmlPath}`));
         return;
@@ -1149,7 +1152,7 @@ async function loadHTML(htmlPath, allFiles) {
 
       const headEl = $doc('head');
       const titleEl = headEl.find('title');
-      const title = titleEl.html();
+      const title = (_titleEl$html = titleEl.html()) == null ? void 0 : _titleEl$html.trim();
       if (DEBUG >= 3) console.log('HTML:\n', showRec({
         html: $doc,
         body: bodyEl.html(),
@@ -1160,9 +1163,13 @@ async function loadHTML(htmlPath, allFiles) {
       el.HtmlDocument = $doc;
       el.HtmlBody = bodyEl;
       el.HtmlHead = headEl;
-      el.metaData = {
-        docTitle: title
-      };
+
+      if (title) {
+        el.metaData = {
+          docTitle: title
+        };
+      }
+
       resolve(el);
     });
   });
