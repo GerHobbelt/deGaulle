@@ -35,6 +35,16 @@ interface MetaDataRecord {
   docTitle: string;
   frontMatter: any;
 }
+
+interface ParsedUrl {
+  node: cheerio.TagElement;
+  attr: string;                // which tag attribute has this URL as a value
+  link: string;                // the source value which parsed into this URL
+  href: string;                // `url.href` cached value
+  error?: Error;
+  url?: URL;
+}
+
 interface ResultFileRecord {
   path: string;
   nameLC: string;
@@ -42,9 +52,12 @@ interface ResultFileRecord {
   relativePath: string;
   destinationRelPath: string;
   relativeJumpToBasePath: string; // a relative path prefix, e.g. '../../' to get back to the rroot/base path from destinationRelPath as CWD
-  RawContent: any;
+  RawContent: string;
   contentIsBinary: boolean;
+  includedInTOC: number;
+  mappingKey: ParsedUrl;
 }
+
 interface ResultHtmlFileRecord extends ResultFileRecord {
   HtmlDocument: cheerio.Root;
   //HtmlContent: string;
@@ -56,8 +69,10 @@ interface ResultHtmlFileRecord extends ResultFileRecord {
   mdTypeMap: Set<string>;
   metaData: MetaDataRecord;
 }
+
 type ResultTextAssetFileRecord = ResultFileRecord
 type ResultBinaryAssetFileRecord = ResultFileRecord
+
 interface ResultsCollection {
   markdown: Map<string, ResultHtmlFileRecord>;
   html: Map<string, ResultHtmlFileRecord>;
@@ -70,6 +85,7 @@ interface ResultsCollection {
   misc: Map<string, ResultBinaryAssetFileRecord>;
   _: Map<string, ResultBinaryAssetFileRecord>;
 }
+
 interface ConfigRecord {
   docTreeBasedir: string;
   destinationPath: string;
@@ -255,7 +271,7 @@ function showRec(rec) {
 
 
 function slugify4Path(filePath: string): string {
-  // slugify eeach path element individually so thee '/' path separators don't get munched in the process!
+  // slugify each path element individually so the '/' path separators don't get munched in the process!
   let elems = unixify(filePath).split('/');
   elems = elems.map(el => {
     return slug(el, {
@@ -368,7 +384,7 @@ function calculateRelativeJumpToBasePath(relativeDirPath: string) {
   if (relativeDirPath === '.' || relativeDirPath == null) { relativeDirPath = ''; }
   relativeDirPath = relativeDirPath.replace(/\/$/, '');  // remove possible trailing /
 
-  // count number of directories and generate a ../../../... path occurdingly:
+  // count number of directories and generate a ../../../... path accordingly:
   const destDepthArr = relativeDirPath.split('/');
   const jumpbackPath = (new Array(destDepthArr.length + 1)).join('../');
   return (relativeDirPath === '' ? './' : jumpbackPath);
@@ -409,15 +425,6 @@ const linksAttr = {
   ],
   srcset: [ 'img', 'source' ]
 } as {[index: string]: string[]};
-
-interface ParsedUrl {
-  node: cheerio.TagElement;
-  attr: string;
-  link: string;
-  href: string;
-  error?: Error;
-  url?: URL;
-}
 
 function getLinks(document: cheerio.Root, baseFilePath: string): ParsedUrl[] {
   const $ = document;
