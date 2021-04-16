@@ -47,11 +47,12 @@ interface ParsedUrl {
 
 interface ResultFileRecord {
   path: string;
+  name: string;
   nameLC: string;
   ext: string;
   relativePath: string;
   destinationRelPath: string;
-  relativeJumpToBasePath: string; // a relative path prefix, e.g. '../../' to get back to the rroot/base path from destinationRelPath as CWD
+  relativeJumpToBasePath: string; // a relative path prefix, e.g. '../../' to get back to the root/base path from destinationRelPath as CWD
   RawContent: string;
   contentIsBinary: boolean;
   includedInTOC: number;
@@ -86,6 +87,28 @@ interface ResultsCollection {
   _: Map<string, ResultBinaryAssetFileRecord>;
 }
 
+interface IgnoreFileRecord {
+  path: string;
+  name: string;
+  relativePath: string;
+}
+
+interface IgnoreDataRecord {
+  directoryPath: string;
+  compiledIgnoreData: any;
+
+  parentRecord: IgnoreDataRecord | null;
+}
+
+interface IgnoreCollection {
+  filesToProcess: Array<IgnoreFileRecord>;
+  directoriesProcessed: Array<string>;
+  directoriesToIgnore: Array<IgnoreFileRecord>;
+  ignoreFilePaths: Array<IgnoreFileRecord>;
+
+  ignoreInfo: IgnoreDataRecord | null;
+}
+
 interface ConfigRecord {
   docTreeBasedir: string;
   destinationPath: string;
@@ -105,6 +128,34 @@ interface MarkdownItEnvironment {
   title: string | null;
 }
 
+
+const globDefaultOptions = {
+  debug: (DEBUG > 4),
+  matchBase: true, // true: pattern starting with / matches the basedir, while non-/-prefixed patterns will match in any subdirectory --> act like **/<pattern>
+  silent: false,   // report errors to console.error UNLESS those are already emitted (`strict` option)
+  strict: true,    // emit errors
+  realpath: true,
+  realpathCache: {},
+  follow: false,
+  dot: false,
+  mark: true,    // postfix '/' for DIR entries
+  nodir: true,
+  sync: false,
+  nounique: false,
+  nonull: false,
+  nosort: true,
+  nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
+  stat: false,
+  noprocess: false,
+  absolute: false,
+  maxLength: Infinity,
+  cache: {},
+  statCache: {},
+  symlinks: {},
+  cwd: null,    // changed to, during the scan
+  root: null,
+  nomount: false,
+};
 
 export default function main() {
   nomnom.script('deGaulle');
@@ -201,16 +252,16 @@ export default function main() {
 
 
 
-function unixify(path) {
+function unixify(path : string) : string {
   return path.replace(/\\/g, '/');
 }
 
-function absSrcPath(rel) {
+function absSrcPath(rel : string) : string {
   const p = path.join(config.docTreeBasedir, rel);
   return unixify(path.resolve(p));
 }
 
-function absDstPath(rel) {
+function absDstPath(rel : string) : string {
   if (!config.destinationPath) {
     throw new Error('Internal error: used too early');
   }
@@ -220,7 +271,7 @@ function absDstPath(rel) {
 
 const SANE_MAX_STRING_LENGTH = 2 * 120;
 
-function limitDebugOutput(str) {
+function limitDebugOutput(str : string) : string {
   if (str && str.length > SANE_MAX_STRING_LENGTH) {
     str = `${str.slice(0, SANE_MAX_STRING_LENGTH - 20)}...\n  ... (length: ${str.length})`;
   }
@@ -276,7 +327,7 @@ function slugify4Path(filePath: string): string {
   elems = elems.map(el => {
     return slug(el, {
       mode: 'filename',
-      replacement: '_',
+      replacement: '_'
     });
   });
 
@@ -340,7 +391,7 @@ function cyrb53hash(str: string, seed = 0) {
 }
 
 
-function readOptionalTxtConfigFile(rel) {
+function readOptionalTxtConfigFile(rel : string) {
   const p = absSrcPath(rel);
   if (fs.existsSync(p)) {
     const src = fs.readFileSync(p, 'utf8');
@@ -368,7 +419,7 @@ function readOptionalTxtConfigFile(rel) {
 
 
 // name to path for wiki links
-function myCustomPageNamePostprocessor(spec) {
+function myCustomPageNamePostprocessor(spec : string) : string {
   // clean up unwanted characters
   spec = spec.replace(/ :: /g, '/');
   spec = spec.replace(/ --* /g, '/');
@@ -380,7 +431,7 @@ function myCustomPageNamePostprocessor(spec) {
 // this assumes `relativeDirPath` is normalized and does not contain ../ path segments anywhere.
 //
 // Returns a ./ or ../.../ path with trailing /
-function calculateRelativeJumpToBasePath(relativeDirPath: string) {
+function calculateRelativeJumpToBasePath(relativeDirPath: string) : string {
   if (relativeDirPath === '.' || relativeDirPath == null) { relativeDirPath = ''; }
   relativeDirPath = relativeDirPath.replace(/\/$/, '');  // remove possible trailing /
 
@@ -561,7 +612,7 @@ function parseLink(link: string, baseUrl: string, node: cheerio.TagElement, attr
 
 
 
-async function loadConfigScript(configScript) {
+async function loadConfigScript(configScript : string) {
   if (configScript) {
     // https://stackoverflow.com/questions/42453683/how-to-reject-in-async-await-syntax
     if (DEBUG >= 1)  console.log(`loadConfigScript(${configScript})`);
@@ -604,6 +655,26 @@ async function sanityCheck(opts, command) {
 }
 
 
+async function globDirectory(pathWithWildCards : string, globConfig) : Promise<Array<string>> {
+  assert(pathWithWildCards != null);
+  if (DEBUG >= 1) console.log('scanPath:', pathWithWildCards);
+
+  return new Promise((resolve, reject) => {
+    glob(pathWithWildCards, globConfig, function processGlobResults(err, files) {
+      if (err) {
+        reject(new Error(`glob scan error: ${err}`));
+        return;
+      }
+
+      if (DEBUG >= 1) console.log(` --> scan: ${JSON.stringify(files, null, 2)}`);
+      resolve(files);
+    });
+  });
+}
+
+
+
+
 async function buildWebsite(opts, command) {
   console.log(
     `buildWebsite: command: ${command || '<no-command>'}, opts: ${JSON.stringify(
@@ -635,9 +706,12 @@ async function buildWebsite(opts, command) {
     console.error('##### ERROR while importing config script. (Will continue with a default script.)\nError: ', err);
     processors = await loadConfigScript(null);
   }
-
+  assert(processors.default != null);
+  assert(typeof processors.default === 'function', `configScript "${configScript}" is supposed to define at least a 'default' processor function`);
+  if (DEBUG >= 1) console.log('configScript.processors = ', processors);
+  
   let firstEntryPointPath = paths[0];
-  // make sure we start with an absolute path; everything will derived off this one.
+  // make sure we start with an absolute path; everything will derive off this one.
   if (!path.isAbsolute(firstEntryPointPath)) {
     firstEntryPointPath = path.join(process.cwd(), firstEntryPointPath);
   }
@@ -653,18 +727,19 @@ async function buildWebsite(opts, command) {
     // - README.md
     let indexFile;
     let indexFilePriority = 0;
-    let scanPath = path.join(firstEntryPointPath, '*.{md,htm,html}');
+    let basePath = firstEntryPointPath;
+    basePath = unixify(basePath);
+    let scanPath = path.join(firstEntryPointPath, '{index,readme}.{md,htm,html}');
     scanPath = unixify(scanPath);
     if (DEBUG >= 1) console.log('scanPath:', scanPath);
-    const files = glob.sync(scanPath, {
-      nosort: true,
-      nomount: true,
-      nounique: false,
-      nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
+
+    const globConfig = Object.assign({}, globDefaultOptions, {
       nodir: true,
-      nobrace: false,
-      gitignore: true
+      cwd: basePath,
     });
+
+    assert(scanPath != null);
+    const files = await globDirectory(scanPath, globConfig);
     if (DEBUG >= 3) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
     const filelist = files || [];
@@ -725,6 +800,7 @@ async function buildWebsite(opts, command) {
   }
 
   config.docTreeBasedir = path.dirname(firstEntryPointPath);
+  if (DEBUG >= 1) console.log('docTreeBasedir = ', config.docTreeBasedir);
 
   let outputDirPath = paths[1] || path.join(config.docTreeBasedir, (!config.docTreeBasedir.endsWith('docs') ? '../docs' : '../' + path.basename(config.docTreeBasedir) + '-output'));
   // make sure we start with an absolute path; everything will derived off this one.
@@ -835,6 +911,171 @@ async function buildWebsite(opts, command) {
 
 
 
+  // now find all gitignore files, load them and use them to find out which DIRECTORIES 
+  // we'll have to ignore at the very least: this should speed up the later global glob
+  // action quite a lot, as we can them specify a solid list of directories to ignore
+  // as part of its search options.
+  //
+  // Produces an object carrying an array of directories to ignore, plus an array listing
+  // all gitignore files, plus a hash table which carries the parsed gitignore files
+  // for further use.
+  //
+  // Each directory/file record has this format:
+  //
+  // {
+  //   path,        -- full path to file
+  //   name         -- filename
+  //   relativePath --  relative path to config.docTreeBasedir
+  // }
+  //
+
+  function mkIgnoreFileRecord(filePath : string) : IgnoreFileRecord {
+    const f = unixify(path.resolve(filePath));
+
+    const fname = path.basename(f);
+
+    const el: IgnoreFileRecord = {
+      path: f,
+      name: fname,
+      relativePath: unixify(path.relative(config.docTreeBasedir, f)),
+    };
+    return el;
+  }
+
+  async function collectAllIgnoreFilesInDirectory(baseDirPath) : Promise<IgnoreCollection> {
+    let basePath = unixify(path.resolve(baseDirPath));
+    let scanPath = path.join(basePath, '*ignore');
+    scanPath = unixify(scanPath);
+    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+
+    const globConfig = Object.assign({}, globDefaultOptions, {
+      dot: true,
+      nodir: true,
+    });
+
+    // Gather all ignore files, collect their content (they are all
+    // assumed to have the same gitignore format anyway) and feed that
+    // to the gitignore compiler:
+    const files = await globDirectory(scanPath, globConfig);
+
+    let rv : IgnoreCollection = {
+      filesToProcess: [],
+      directoriesProcessed: [],
+      directoriesToIgnore: [],
+      ignoreFilePaths: [],
+      ignoreInfo: null,   
+    };
+
+    let ignoreContent = [];
+    for (const p of files || []) {
+      const el = mkIgnoreFileRecord(p);
+
+      ignoreContent.push(fs.readFileSync(el.path, 'utf8'));
+
+      rv.ignoreFilePaths.push(el);
+    }
+
+    // Now that we have collected all ignore files' content, we can
+    // check if there's anything useful in there and compile that
+    // for further use later on. 
+
+    let str = ignoreContent.join('\n\n\n').trim();
+    if (str.length > 0) {
+      // at least there's something to parse today...
+      let gitignoreData = gitignoreParser.compile(str);
+
+      let rec : IgnoreDataRecord = {
+        directoryPath: basePath,
+        compiledIgnoreData: gitignoreData,
+
+        parentRecord: null,            // we don't know yet if this directory has a parent with gitignore data...
+      };
+      rv.ignoreInfo = rec;
+    }
+
+    return rv;
+  }
+
+  function isPathAcceptedByIgnoreRecords(path: string, ignoreRecord : IgnoreDataRecord) : boolean {
+    if (!ignoreRecord || !ignoreRecord.compiledIgnoreData)
+      return true;
+
+    // gitignore rules: when a child gitignore file has something to say 
+    // about a path, then we do not bother the parent. (Override By Child)
+    if (ignoreRecord.compiledIgnoreData.inspects(path)) {
+      return ignoreRecord.compiledIgnoreData.accepts(path);
+    }
+    if (ignoreRecord.parentRecord) {
+      return isPathAcceptedByIgnoreRecords(path, ignoreRecord.parentRecord);
+    }
+    // accept by default
+    return true;
+  }
+
+  async function collectAllExceptIgnoredInDirectory(baseDirPath : string, parentIgnores : IgnoreDataRecord) : Promise<IgnoreCollection> {
+    assert(baseDirPath != null);
+    let basePath = path.resolve(baseDirPath);
+    let scanPath = path.join(basePath, '*');
+    scanPath = unixify(scanPath);
+    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+
+    const globConfig = Object.assign({}, globDefaultOptions, {
+      nodir: false,
+      mark: true,
+    });
+
+    assert(scanPath != null);
+    const files = await globDirectory(scanPath, globConfig);
+
+    // collect all the local ignore files.
+    let dirscanInfo : IgnoreCollection = await collectAllIgnoreFilesInDirectory(basePath);
+    let activeIgnoreRecord : IgnoreDataRecord = dirscanInfo.ignoreInfo;
+    // hook up the parent if there's any
+    if (activeIgnoreRecord && parentIgnores) {
+      activeIgnoreRecord.parentRecord = parentIgnores;
+    }
+    // otherwise, when we have no ignore record of our own, use the parent as-is
+    else if (!activeIgnoreRecord) {
+      activeIgnoreRecord = parentIgnores;
+    }
+
+    let directoriesToScan : Array<string> = [];
+
+    for (const p of files || []) {
+      // skip the entries which are NOT directories? 
+      // Nah, keep them around for the ignore check that comes next:
+      const isDir = p.endsWith('/');
+      let d = mkIgnoreFileRecord(p);
+
+      const ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord);
+      if (DEBUG >= 1) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`);
+
+      // when the eentry is to be ignored, we add it to the list:
+      if (!ok) {
+        dirscanInfo.directoriesToIgnore.push(d);
+      } else if (isDir) {
+        directoriesToScan.push(d.path);
+      } else {
+        dirscanInfo.filesToProcess.push(d);
+      }
+    }
+
+    dirscanInfo.directoriesProcessed.push(basePath);
+
+    // now go and investigate the okay-ed subdirectories:
+    for (const p of directoriesToScan) {
+      let rv = await collectAllExceptIgnoredInDirectory(p, activeIgnoreRecord);
+
+      dirscanInfo.filesToProcess = dirscanInfo.filesToProcess.concat(rv.filesToProcess);
+      dirscanInfo.directoriesToIgnore = dirscanInfo.directoriesToIgnore.concat(rv.directoriesToIgnore);
+      dirscanInfo.directoriesProcessed = dirscanInfo.directoriesProcessed.concat(rv.directoriesProcessed);
+      dirscanInfo.ignoreFilePaths = dirscanInfo.ignoreFilePaths.concat(rv.ignoreFilePaths);
+    }
+
+    return dirscanInfo;
+  }
+
+
   // now scan the entire tree: collect potential files for comparison & treatment
   //
   // Produces an array of categories, which each are an array of file records,
@@ -848,82 +1089,72 @@ async function buildWebsite(opts, command) {
   // }
   //
   async function collectAllFiles() : Promise<ResultsCollection> {
-    let scanPath = path.join(config.docTreeBasedir, '**/*');
-    scanPath = unixify(scanPath);
-    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+    let basePath = config.docTreeBasedir;
+    basePath = unixify(basePath);
 
-    return new Promise((resolve, reject) => {
-      glob(scanPath, {
-        nosort: true,
-        nomount: true,
-        nounique: false,
-        nocase: true,     //<-- uncomment this one for total failure to find any files >:-((
-        nodir: true,
-        nobrace: false,
-        gitignore: true
-      }, function processGlobResults(err, files) {
-        if (err) {
-          reject(new Error(`glob scan error: ${err}`));
-          return;
-        }
+    let files : IgnoreCollection = await collectAllExceptIgnoredInDirectory(basePath, null);
 
-        if (DEBUG >= 1) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
+    if (DEBUG >= 2) console.log(`root point DIR --> scan: ${JSON.stringify(files, null, 2)}`);
 
-        const rv: ResultsCollection = {
-          markdown: new Map(),
-          html: new Map(),
-          css: new Map(),
-          js: new Map(),
-          image: new Map(),
-          movie: new Map(),
-          archive: new Map(),
-          distro: new Map(),
-          misc: new Map(),
-          _: new Map()
-        };
+    const rv: ResultsCollection = {
+      markdown: new Map(),
+      html: new Map(),
+      css: new Map(),
+      js: new Map(),
+      image: new Map(),
+      movie: new Map(),
+      archive: new Map(),
+      distro: new Map(),
+      misc: new Map(),
+      _: new Map()
+    };
 
-        for (const p of files || []) {
-          AddFileToCollection(p, rv);
-        }
-        resolve(rv);
-      });
-    });
+    for (const rec of files.filesToProcess || []) {
+      AddFileToCollection(rec, rv);
+    }
+
+    return rv;
   }
 
-  function AddFileToCollection(p, collection) {
-    const f = unixify(path.resolve(p));
-    if (DEBUG >= 9) console.log('hacky fix for glob output not being abs path on Windows:', { 'in': p, out: f });
-    const fname = path.basename(f);
+  function AddFileToCollection(fileInfo : IgnoreFileRecord, collection) {
+    // check if the file is to be 'ignored' and treated as a static binary asset:
+    let special = false;
+    let fpath = fileInfo.path;
+    let fname = fileInfo.name;
+    if (!fname) 
+    {
+      console.error("AddFileToCollection:", fileInfo)
+    }
 
-    // check if the file is to be ignored:
-    let ignore = false;
-
-    [ 'CNAME', '.nojekyll', /\.vcxproj/, /^site-builder\./, /^Makefile$/ ].forEach((f) => {
-      if (typeof f === 'string' && f === fname) {
-        ignore = true;
+    [ 'CNAME', '.nojekyll' ].forEach((f : any) => {
+      if (typeof f === 'string' && fname.endsWith(f)) {
+        special = true;
       } else if (f instanceof RegExp && f.test(fname)) {
-        ignore = true;
+        special = true;
       }
     });
 
-    if (!ignore) {
-      const ext = path.extname(fname).toLowerCase();
-      const el: ResultFileRecord = {
-        path: f,
-        nameLC: fname.toLowerCase(),
-        ext: ext,
-        relativePath: unixify(path.relative(config.docTreeBasedir, f)),
-        destinationRelPath: null,
-        relativeJumpToBasePath: null,
-        RawContent: null,
-        contentIsBinary: rv_mapping_bin_content[ext] || false
-      };
-      const cat = rv_mapping.get(ext) || 'misc';
-      collection[cat].set(f, el);
-      collection._.set(f, el);
-    } else {
-      console.log(`INFO: Ignoring file '${f}'.`);
+    let ext = path.extname(fname).toLowerCase();
+    if (special) {
+      ext = '';
     }
+
+    const el: ResultFileRecord = {
+      path: fpath,
+      name: fname,
+      nameLC: fname.toLowerCase(),
+      ext: ext,
+      relativePath: unixify(path.relative(config.docTreeBasedir, fpath)),
+      destinationRelPath: null,
+      relativeJumpToBasePath: null,
+      RawContent: null,
+      contentIsBinary: rv_mapping_bin_content[ext] || special,
+      includedInTOC: 0,
+      mappingKey: null
+    };
+    const cat = rv_mapping.get(ext) || 'misc';
+    collection[cat].set(fpath, el);
+    collection._.set(fpath, el);
   }
 
 
@@ -1054,7 +1285,7 @@ async function buildWebsite(opts, command) {
   });
 
   const allFiles: ResultsCollection = await scan;
-  if (DEBUG >= 4) console.log('!!!!!!!!!!!!!!!! allFiles:', limitDebugOutput4Collection(allFiles));
+  if (DEBUG >= 1) console.log('!!!!!!!!!!!!!!!! allFiles:', limitDebugOutput4Collection(allFiles));
 
   if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
     throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
@@ -1512,8 +1743,15 @@ async function buildWebsite(opts, command) {
     )}`
   );
 
+  // first we write the 'default' CNAME and .nojekyll files here. 
+  // IFF the user has also provideed these, they will overwrite these ones 
+  // in the subsequent copy/write action.
+  if (DEBUG >= 1) console.log(`Copying the extra files to the website destination directory '${config.destinationPath}'...`);
+
+  await mdGenerated(config.destinationPath);
+
   // now write the CSS, HTML, JS and other files:
-  console.log(`Writing all processed & collected files to the website destination directory '${config.docTreeBasedir}'...`);
+  console.log(`Writing all processed & collected files to the website destination directory '${config.destinationPath}'...`);
 
   for (const type in allFiles) {
     switch (type) {
@@ -1572,20 +1810,6 @@ async function buildWebsite(opts, command) {
       continue;
     }
   }
-
-  if (DEBUG >= 1) console.log(`Copying the extra files to the website destination directory '${config.docTreeBasedir}'...`);
-
-  // add a couple of important files, which are probably not included in the file list yet:
-  [ 'CNAME', '.nojekyll' ].forEach((f) => {
-    const p = unixify(path.resolve(path.join(config.docTreeBasedir, f)));
-    if (fs.existsSync(p)) {
-      const destFilePath = unixify(path.join(opts.output, f));
-
-      const dstDir = unixify(path.dirname(destFilePath));
-      fs.mkdirSync(dstDir, { recursive: true });
-      fs.copyFileSync(p, destFilePath, fs.constants.COPYFILE_FICLONE);
-    }
-  });
 }
 
 
@@ -1832,7 +2056,7 @@ function filterHtmlOfGetsatisfactionPages(entry: ResultHtmlFileRecord) {
 
     // https://api.jquery.com/category/selectors/
     // kill one of the style sheets at least
-    'href*="assets/employee_tools"',
+    'href*="assets/employee_tools"'
   ];
   metalist.forEach(prop => {
     headEl.find(`[${ prop }]`).remove();
@@ -1850,7 +2074,7 @@ function filterHtmlOfGetsatisfactionPages(entry: ResultHtmlFileRecord) {
     'link[type="text/css"]',
     '#overlay',
     '#followable_dropdown',
-    '#mini_profile',
+    '#mini_profile'
   ];
   kill_list.forEach(prop => {
     $doc(prop).remove();
@@ -1859,7 +2083,7 @@ function filterHtmlOfGetsatisfactionPages(entry: ResultHtmlFileRecord) {
   const kill_attr_list = [
     'onclick',
     'onmouseover',
-    'onmouseout',
+    'onmouseout'
   ];
   kill_attr_list.forEach(prop => {
     $doc(`[${ prop }]`).removeAttr(prop);
@@ -1870,7 +2094,7 @@ function filterHtmlOfGetsatisfactionPages(entry: ResultHtmlFileRecord) {
   while (node != null) {
     if (node.type === 'comment') {
       // HACK: turn this into an empty 'text' node instead!
-      let tn = node as any;   // shut up TypeScript too...
+      const tn = node as any;   // shut up TypeScript too...
       tn.type = 'text';
       tn.data = '';
     }
@@ -2015,7 +2239,6 @@ function cleanSingleTokenForDisplay(token) {
   return rv;
 }
 
-// https://vuepress.vuejs.org/plugin/life-cycle.html#generated
 async function mdGenerated(pagePaths) {
   // cp docs-src/.nojekyll docs/ && cp docs-src/CNAME docs/
   console.error('async generated HIT');
