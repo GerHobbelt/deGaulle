@@ -852,6 +852,12 @@ async function buildWebsite(opts, command) {
       'ai',
       'webp'
     ],
+    font: [
+      'ttf',
+      'otf',
+      'eot',
+      'woff2'
+    ],
     movie: [
       'mkv',
       'mp4',
@@ -944,7 +950,7 @@ async function buildWebsite(opts, command) {
 
   async function collectAllIgnoreFilesInDirectory(baseDirPath) : Promise<IgnoreCollection> {
     let basePath = unixify(path.resolve(baseDirPath));
-    let scanPath = path.join(basePath, '*ignore');
+    let scanPath = path.join(basePath, '.*ignore');
     scanPath = unixify(scanPath);
     if (DEBUG >= 1) console.log('scanPath:', scanPath);
 
@@ -1047,7 +1053,10 @@ async function buildWebsite(opts, command) {
       const isDir = p.endsWith('/');
       let d = mkIgnoreFileRecord(p);
 
-      const ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord);
+      let ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord);
+      // NOTE: the ignore files are themselves *ignored by default*:
+      // dot-files are all ignored always.
+
       if (DEBUG >= 1) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`);
 
       // when the eentry is to be ignored, we add it to the list:
@@ -1685,7 +1694,7 @@ async function buildWebsite(opts, command) {
 
     <footer>
       © 2020 Qiqqa Contributors ::
-      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/docs-src/${ originalPath }">Edit this page on GitHub</a>
+      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/master/docs-src/${ originalPath }">Edit this page on GitHub</a>
     </footer>
   </body>
 </html>

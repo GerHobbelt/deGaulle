@@ -642,6 +642,7 @@ async function buildWebsite(opts, command) {
     js: ['js', 'mjs', 'ejs', 'cjs', 'ts', 'coffee'],
     css: ['css', 'scss', 'less', 'styl', 'stylus'],
     image: ['png', 'gif', 'jpg', 'jpeg', 'tiff', 'bmp', 'svg', 'psd', 'ai', 'webp'],
+    font: ['ttf', 'otf', 'eot', 'woff2'],
     movie: ['mkv', 'mp4', 'avi', 'mov', 'flv', 'webm'],
     archive: ['zip', 'rar', 'gz', 'bz2', '7z'],
     distro: ['exe', 'msi']
@@ -720,7 +721,7 @@ async function buildWebsite(opts, command) {
 
   async function collectAllIgnoreFilesInDirectory(baseDirPath) {
     let basePath = unixify(path.resolve(baseDirPath));
-    let scanPath = path.join(basePath, '*ignore');
+    let scanPath = path.join(basePath, '.*ignore');
     scanPath = unixify(scanPath);
     if (DEBUG >= 1) console.log('scanPath:', scanPath);
     const globConfig = Object.assign({}, globDefaultOptions, {
@@ -812,7 +813,9 @@ async function buildWebsite(opts, command) {
       // Nah, keep them around for the ignore check that comes next:
       const isDir = p.endsWith('/');
       let d = mkIgnoreFileRecord(p);
-      const ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord);
+      let ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord); // NOTE: the ignore files are themselves *ignored by default*:
+      // dot-files are all ignored always.
+
       if (DEBUG >= 1) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`); // when the eentry is to be ignored, we add it to the list:
 
       if (!ok) {
@@ -1372,7 +1375,7 @@ async function buildWebsite(opts, command) {
 
     <footer>
       © 2020 Qiqqa Contributors ::
-      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/docs-src/${originalPath}">Edit this page on GitHub</a>
+      <a href="https://github.com/GerHobbelt/qiqqa-open-source/blob/master/docs-src/${originalPath}">Edit this page on GitHub</a>
     </footer>
   </body>
 </html>
