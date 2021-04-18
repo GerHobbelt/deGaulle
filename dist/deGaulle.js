@@ -213,6 +213,14 @@ function slugify4TitleId(title) {
 
   });
 }
+//
+// underscores or dashes *around* a word are kept as-is:
+//    _laugh_ or -perish- 
+
+
+function sanitizePathTotitle(str) {
+  return str.replace(/(?:^|\b)-(?:\b|$)/g, ' ').replace(/(?:^|\B)_(?:\B|$)/g, ' ').trim();
+} // CYRB53 hash (NOT a secure hash)
 
 function readOptionalTxtConfigFile(rel) {
   const p = absSrcPath(rel);
@@ -1331,7 +1339,7 @@ async function buildWebsite(opts, command) {
             if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
             filterHtmlHeadAfterMetadataExtraction(entry); // re title: frontMatter should have precedence over any other title source, including the title extracted from the document via H1
 
-            const pathTitle = path.basename(entry.relativePath, entry.ext).replace(/(?:^|\b)[-_](?:\b|$)/g, ' ');
+            const pathTitle = sanitizePathTotitle(path.basename(entry.relativePath, entry.ext));
             let title = (((_entry$metaData = entry.metaData) == null ? void 0 : (_entry$metaData$front = _entry$metaData.frontMatter) == null ? void 0 : _entry$metaData$front.title) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : _entry$metaData2.docTitle) || pathTitle).trim();
             console.log('TITLE extraction:', {
               meta: entry.metaData,

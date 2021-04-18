@@ -375,6 +375,17 @@ function slugify4FileName(filePath: string, maxLength = 64): string {
 }
 
 
+// remove dahes and _ underscores which represent spaces. 
+//
+// underscores or dashes *around* a word are kept as-is:
+//    _laugh_ or -perish- 
+function sanitizePathTotitle(str) {
+  return str
+  .replace(/(?:^|\b)-(?:\b|$)/g, ' ')
+  .replace(/(?:^|\B)_(?:\B|$)/g, ' ')
+  .trim();
+}
+
 // CYRB53 hash (NOT a secure hash)
 // as per https://stackoverflow.com/questions/7616461/generate-a-hash-from-string-in-javascript/52171480#52171480
 // (re `number` type: see https://spin.atomicobject.com/2018/11/05/using-an-int-type-in-typescript/ - deemed too much cost & effort right now)
@@ -1655,7 +1666,7 @@ async function buildWebsite(opts, command) {
           filterHtmlHeadAfterMetadataExtraction(entry);
 
           // re title: frontMatter should have precedence over any other title source, including the title extracted from the document via H1
-          const pathTitle = path.basename(entry.relativePath, entry.ext).replace(/(?:^|\b)[-_](?:\b|$)/g, ' ');
+          const pathTitle = sanitizePathTotitle(path.basename(entry.relativePath, entry.ext));
           let title = (entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || pathTitle)
           .trim();
           console.log('TITLE extraction:', { meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle, title });
