@@ -306,14 +306,14 @@ function getLinks(document, baseFilePath) {
       htmlBaseUrl
     });
     realBaseUrl = getBaseUrl(htmlBaseUrl, baseFilePath);
-    console.log('getBaseUrl:', {
+    if (DEBUG >= 1) console.log('getBaseUrl:', {
       htmlBaseUrl,
       baseFilePath,
       realBaseUrl
     });
   } else {
     realBaseUrl = getBaseUrl('.', baseFilePath);
-    console.log('getBaseUrl:', {
+    if (DEBUG >= 2) console.log('getBaseUrl:', {
       dir: '.',
       baseFilePath,
       realBaseUrl
@@ -355,7 +355,7 @@ function getLinks(document, baseFilePath) {
           const link = parseLink(v, realBaseUrl, element, attr);
 
           if (!v.startsWith('https://')) {
-            console.log('parseLink:', {
+            if (DEBUG >= 2) console.log('parseLink:', {
               v,
               realBaseUrl,
               result: link.url
@@ -497,7 +497,7 @@ async function sanityCheck(opts, command) {
 
 async function globDirectory(pathWithWildCards, globConfig) {
   assert(pathWithWildCards != null);
-  if (DEBUG >= 1) console.log('scanPath:', pathWithWildCards);
+  if (DEBUG >= 8) console.log('scanPath:', pathWithWildCards);
   return new Promise((resolve, reject) => {
     glob(pathWithWildCards, globConfig, function processGlobResults(err, files) {
       if (err) {
@@ -559,7 +559,7 @@ async function buildWebsite(opts, command) {
     basePath = unixify(basePath);
     let scanPath = path.join(firstEntryPointPath, '{index,readme}.{md,htm,html}');
     scanPath = unixify(scanPath);
-    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+    if (DEBUG >= 8) console.log('scanPath:', scanPath);
     const globConfig = Object.assign({}, globDefaultOptions, {
       nodir: true,
       cwd: basePath
@@ -731,7 +731,7 @@ async function buildWebsite(opts, command) {
     let basePath = unixify(path.resolve(baseDirPath));
     let scanPath = path.join(basePath, '.*ignore');
     scanPath = unixify(scanPath);
-    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+    if (DEBUG >= 8) console.log('scanPath:', scanPath);
     const globConfig = Object.assign({}, globDefaultOptions, {
       dot: true,
       nodir: true
@@ -796,7 +796,7 @@ async function buildWebsite(opts, command) {
     let basePath = path.resolve(baseDirPath);
     let scanPath = path.join(basePath, '*');
     scanPath = unixify(scanPath);
-    if (DEBUG >= 1) console.log('scanPath:', scanPath);
+    if (DEBUG >= 8) console.log('scanPath:', scanPath);
     const globConfig = Object.assign({}, globDefaultOptions, {
       nodir: false,
       mark: true
@@ -824,7 +824,7 @@ async function buildWebsite(opts, command) {
       let ok = isPathAcceptedByIgnoreRecords(d.path, activeIgnoreRecord); // NOTE: the ignore files are themselves *ignored by default*:
       // dot-files are all ignored always.
 
-      if (DEBUG >= 1) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`); // when the eentry is to be ignored, we add it to the list:
+      if (DEBUG >= 8) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`); // when the eentry is to be ignored, we add it to the list:
 
       if (!ok) {
         dirscanInfo.directoriesToIgnore.push(d);
@@ -1011,7 +1011,7 @@ async function buildWebsite(opts, command) {
     include: {
       root: '/includes/',
       getRootDir: (options, state, startLine, endLine) => {
-        console.log('state:', {
+        if (DEBUG >= 2) console.log('includes:: state:', {
           state
         });
         return state.env.getIncludeRootDir(options, state, startLine, endLine);
@@ -1046,7 +1046,7 @@ async function buildWebsite(opts, command) {
     }
   });
   const allFiles = await scan;
-  if (DEBUG >= 1) console.log('!!!!!!!!!!!!!!!! allFiles:', limitDebugOutput4Collection(allFiles));
+  if (DEBUG >= 2) console.log('!!!!!!!!!!!!!!!! allFiles:', limitDebugOutput4Collection(allFiles));
 
   if (!allFiles.markdown.get(firstEntryPointPath) && !allFiles.html.get(firstEntryPointPath)) {
     throw new Error(`root file '${firstEntryPointPath}' is supposed to be part of the website`);
@@ -1341,7 +1341,8 @@ async function buildWebsite(opts, command) {
 
             const pathTitle = sanitizePathTotitle(path.basename(entry.relativePath, entry.ext));
             let title = (((_entry$metaData = entry.metaData) == null ? void 0 : (_entry$metaData$front = _entry$metaData.frontMatter) == null ? void 0 : _entry$metaData$front.title) || ((_entry$metaData2 = entry.metaData) == null ? void 0 : _entry$metaData2.docTitle) || pathTitle).trim();
-            console.log('TITLE extraction:', {
+            if (DEBUG >= 1) console.log('TITLE extraction:', {
+              sourcePath: entry.relativePath,
               meta: entry.metaData,
               docTitle: (_entry$metaData3 = entry.metaData) == null ? void 0 : _entry$metaData3.docTitle,
               fmTitle: (_entry$metaData4 = entry.metaData) == null ? void 0 : (_entry$metaData4$fron = _entry$metaData4.frontMatter) == null ? void 0 : _entry$metaData4$fron.title,
@@ -1398,7 +1399,7 @@ async function buildWebsite(opts, command) {
             entry.HtmlBody = bodyEl;
             entry.HtmlHead = headEl;
             const linkCollection = getLinks($doc, entry.destinationRelPath);
-            console.log('collected links for postprocessing:', {
+            if (DEBUG >= 2) console.log('collected links for postprocessing:', {
               originalPath,
               linkCollection
             });
@@ -1651,7 +1652,7 @@ function filterHtmlHeadAfterMetadataExtraction(entry) {
 function filterHtmlOfGetsatisfactionPages(entry) {
   const $doc = entry.HtmlDocument;
   const headEl = $doc('head');
-  console.log('getsatis filtering:', {
+  if (DEBUG >= 2) console.log('getsatis filtering:', {
     headEl,
     children: headEl.children()
   }); // delete all <script> elements anywhere in there:
@@ -1800,7 +1801,7 @@ function cleanSingleTokenForDisplay(token) {
 
 async function mdGenerated(pagePaths) {
   // cp docs-src/.nojekyll docs/ && cp docs-src/CNAME docs/
-  console.error('async generated HIT');
+  console.log('async generated HIT');
   fs.writeFileSync(absDstPath('CNAME'), 'qiqqa.org\n', 'utf8');
   fs.writeFileSync(absDstPath('.nojekyll'), '');
 }
