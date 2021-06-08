@@ -1072,7 +1072,7 @@ async function buildWebsite(opts, command) {
 
       if (DEBUG >= 8) console.log(`isPathAcceptedByIgnoreRecords("${d.path}") --> pass: ${ok}, isDir: ${isDir}`);
 
-      // when the eentry is to be ignored, we add it to the list:
+      // when the entry is to be ignored, we add it to the list:
       if (!ok) {
         dirscanInfo.directoriesToIgnore.push(d);
       } else if (isDir) {
