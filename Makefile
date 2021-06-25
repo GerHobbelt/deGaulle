@@ -103,12 +103,12 @@ report-config:
 doc:
 	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
-	dist/cli.js build -d 9 docs-src/ --output ./docs/
+	dist/cli.js build -d 1 docs-src/ --output ./docs/
 
 qiqqa:
 	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
-	dist/cli.js build -d 9 ../qiqqa/docs-src/ --output ./docs-qiqqa/ --config ../qiqqa/docs-src/site-builder.mjs
+	dist/cli.js build -d 1 ../qiqqa/docs-src/ --output ./docs-qiqqa/ --config ../qiqqa/docs-src/site-builder.mjs
 
 
 serve:

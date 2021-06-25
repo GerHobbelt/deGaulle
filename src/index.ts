@@ -134,6 +134,26 @@ interface MarkdownItEnvironment {
   title: string | null;
 }
 
+enum UrlMappingSource {
+  SOURCED_BY_NOBODY,
+  SOURCEFILE_NAME,    // MarkDown, HTML, Asset, ... 
+  WIKILINK_PAGENAME,
+  MARKDOWN_TRANSFORM,
+  SLUGIFICATION,
+  TITLE_EXTRACTION,
+  POSTPROCESSING, // all sorts of transforms that happen during the "we'll fix it in post" final phase.
+};
+
+interface UrlMappingRecord {
+  originator: UrlMappingSource;
+  source: string;
+  target: string; // URL ?
+};
+
+type UrlMappingCollection = Map<string, UrlMappingRecord>;
+
+
+
 
 const globDefaultOptions = {
   debug: (DEBUG > 4),
@@ -357,17 +377,65 @@ function showRec(rec) {
 
 
 
+function __slugify4pathelement(el: string): string {
+  // custom acronym replacements BEFORE we slugify for filesystem:
+  // always surround these by '_' so they will stand out as before.
+  // the remainder of this slugifier will take care of the potential
+  // '_' duplicates, etc. in there...
+  el = el 
+  .replace(/C\+\+/g, '_Cpp_');
+
+  // Now do the slugging...
+  el = slug(el, {
+    mode: 'filename',
+    replacement: '_',
+    allowed: /[^\p{L}\p{N}_~.-]/gu,
+  });
+  // no mutiple dots allowed: 
+  // Dots are only tolerated in the inner sanctum of the directory name,
+  // OR a single dot at the START of the name.
+  // Nor do we tolerate tildes anywhere but at the start, and then ONE ONLY.
+  // Dashes are okay, as long they appear in the inner sanctum only.
+  // Underscores must not appear in groups either and are okay in the inner sanctum only.
+  // Also, of all the ones we tolerate at the START, only a SINGLE ONE is permitted.
+  // No riffing off .~_no_shall_do! We're a _Serious_ lot here!
+  let start = /^[.~]/.exec(el);
+  el = el 
+  .replace(/[_~.-][_~.-]+/g, '_')      // ellipsis, etc. --> '_'
+  .replace(/^[_~.-]/g, '')
+  .replace(/[_~.-]$/g, '');
+  if (start) {
+    el = start[0] + el;
+  }
+  return el;
+}
+
 function slugify4Path(filePath: string): string {
   // slugify each path element individually so the '/' path separators don't get munched in the process!
   let elems = unixify(filePath).split('/');
-  elems = elems.map(el => {
-    return slug(el, {
-      mode: 'filename',
-      replacement: '_'
-    });
-  });
+  elems = elems.map((el) => __slugify4pathelement(el));
 
   return elems.join('/');
+}
+
+function slugify4PathExt(fileExtension: string): string {
+  // the leading dot will automatically be stripped! 
+  let dot = fileExtension.startsWith('.');
+  if (dot) {
+    fileExtension = fileExtension.slice(1);
+  }
+  // no dots allowed in a (stripped) file extension!
+  fileExtension = fileExtension
+  .replace(/[.]/g, '_');
+
+  fileExtension = __slugify4pathelement(fileExtension);
+  if (fileExtension.length) {
+    if (dot)
+      return '.' + fileExtension;
+    else
+      return fileExtension;
+  }
+  return '';
 }
 
 function slugify4TitleId(title: string): string {
@@ -436,6 +504,66 @@ function cyrb53hash(str: string, seed = 0) {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
+
+
+
+
+
+
+const pathMapping: UrlMappingCollection = new Map<string, UrlMappingRecord>();
+
+function registerPathMapping(mapRecord: UrlMappingRecord) {
+  let key = mapRecord.source;
+
+  // sanity checks before we register anything:
+  // do not register entries which map a source onto itself to prevent cycles:
+  if (mapRecord.source === mapRecord.target)
+    return;
+  if (mapRecord.source == null)
+    return;
+
+  if (pathMapping.has(key)) {
+    let oldRec = pathMapping.get(key);
+    if (mapRecord.source === oldRec.source && mapRecord.target === oldRec.target)
+      return;      // no change, don't bother about it
+    if (mapRecord.source === oldRec.source) {
+      // an update!
+      registerPathMapping({
+        originator: mapRecord.originator + 100,
+        source: oldRec.target,
+        target: mapRecord.target
+      });
+      return;      // no change, don't bother about it
+    }
+    console.log('WARNING: pathMapping key collision:', { key, mapRecord, oldRec });
+    throw new Error(`pathMapping key '${key}' has already been defined previously: ${ JSON.stringify(oldRec) } vs. ${ JSON.stringify(mapRecord) }`);
+  }
+  pathMapping.set(key, mapRecord);
+}
+
+function followPathMapping(src: string) : UrlMappingRecord {
+  let rec: UrlMappingRecord = {
+    originator: UrlMappingSource.SOURCED_BY_NOBODY,
+    source: src,
+    target: src,
+  };
+
+  while (pathMapping.has(src)) {
+    let rec = pathMapping.get(src);
+    src = rec.source;
+  }
+
+  return rec;
+}
+
+
+
+
+
+
+
+
+
 
 
 function readOptionalTxtConfigFile(rel : string) {
@@ -1359,6 +1487,14 @@ async function buildWebsite(opts, command) {
       postProcessPageName: function (pageName) {
         const rv = myCustomPageNamePostprocessor(pageName);
         if (DEBUG >= 2) console.log('wikilink transform:', { 'in': pageName, out: rv });
+
+        // TODO: check existence of target and report error + suggestion if absent!
+
+        registerPathMapping({
+          originator: UrlMappingSource.WIKILINK_PAGENAME,
+          source: pageName, 
+          target: rv
+        });
         return rv;
       }
     },
@@ -1368,6 +1504,7 @@ async function buildWebsite(opts, command) {
 
     // @[toc](Title)
     toc: true,
+
     // @[toc]               -- no title...
     tocAndAnchor: false,
 
@@ -1439,6 +1576,11 @@ async function buildWebsite(opts, command) {
 
           if (DEBUG >= 3) console.log('specRec:', showRec(specRec2));
           assert.strictEqual(specRec2, entry);
+
+          // special treatment for the getsatisfaction.com collective:
+          if (key.includes('getsatisfaction-mirror/')) {
+            filterHtmlOfGetsatisfactionPages(entry);
+          }
         }
       }
       continue;
@@ -1450,7 +1592,7 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+          entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + slugify4PathExt(entry.ext);
           entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
           if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
 
@@ -1468,7 +1610,7 @@ async function buildWebsite(opts, command) {
         for (const slot of collection) {
           const key = slot[0];
           const entry = slot[1];
-          entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + entry.ext;
+          entry.destinationRelPath = slugify4Path(entry.relativePath.slice(0, entry.relativePath.length - entry.ext.length)) + slugify4PathExt(entry.ext);
           entry.relativeJumpToBasePath = calculateRelativeJumpToBasePath(path.dirname(entry.destinationRelPath));
           if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record:`, showRec(entry));
 
@@ -1491,132 +1633,72 @@ async function buildWebsite(opts, command) {
 
 
 
-  console.log('tracing site files...');
+  console.log('Making sure all site files have unique (non-colliding) targets...');
 
-  // now trace the access graph:
-  //
-  // [css, js, image, movie, misc, _]
-  for (const type in allFiles) {
-    switch (type) {
-    case '_':
-      continue;
+  // Thanks to the slugification of the destination file paths, we MAY have ended up with a bunch
+  // of collisions!
+  {
+    const collisionCheckMap = new Map<string, ResultHtmlFileRecord>();
 
-    case 'markdown':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-          //entry.destinationRelPath
-        }
+    function mk_unique_path(filePath: string, list: Map<string, ResultHtmlFileRecord>) {
+      let ext = path.extname(filePath);
+      let name = filePath.slice(0, filePath.length - ext.length);
+      let seqnum = 2;
+
+      for (;;) {
+        let testPath = name + `_${seqnum}` + ext;
+        if (!list.has(testPath))
+          return testPath;
       }
-      continue;
-
-    case 'html':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-          // It doesn't matter whether these started out as .htm or .html files: we output them as .html files anyway:
-          //entry.destinationRelPath
-        }
-      }
-      continue;
-
-    case 'css':
-    case 'js':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-          //entry.destinationRelPath
-        }
-      }
-      continue;
-
-    default:
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-          //entry.destinationRelPath
-        }
-      }
-      continue;
     }
-  }
 
+    for (const type in allFiles) {
+      switch (type) {
+      case '_':
+        continue;
 
+      case 'markdown':
+      case 'html':
+      case 'css':
+      case 'js':
+      default:
+        {
+          const collection = allFiles[type];
+          for (const slot of collection) {
+            const key = slot[0];
+            const entry = slot[1];
+            
+            let pathkey = entry.destinationRelPath;
 
+            // only *.js and [misc] files can have aleading dot in their filename;
+            // the other CANNOT. (html, css, md, etc. cannot have leading dots as they
+            // never sanely serve a purpose where they should/must be hidden in a directory)
+            if (type !== 'js' && type !== 'misc') {
+              pathkey = pathkey
+              .replace(/\/[.]([^\/]*)$/, '/_$1');
 
+              entry.destinationRelPath = pathkey;
+            }
 
+            if (collisionCheckMap.has(pathkey)) {
+              let old = collisionCheckMap.get(pathkey);
+              console.log("WARNING: collision for ", old, "vs.", slot); 
+              entry.destinationRelPath = mk_unique_path(pathkey, collisionCheckMap);
+            }
 
-
-
-
-
-  console.log('updating/patching site files...');
-
-  // now patch links, etc. in the HTML, MarkDown, CSS and JS files:
-  //
-  // [css, js, image, movie, misc, _]
-  for (const type in allFiles) {
-    switch (type) {
-    case '_':
-      continue;
-
-    case 'markdown':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-        }
-      }
-      continue;
-
-    case 'html':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-
-          if (key.includes('getsatisfaction-mirror/')) {
-            filterHtmlOfGetsatisfactionPages(entry);
+            // only now that we've guaranteed that we have unique destination paths, can we 
+            // safely and sanely register the mapping of source to destination:
+            registerPathMapping({
+              originator: UrlMappingSource.SOURCEFILE_NAME,
+              source: entry.relativePath, 
+              target: entry.destinationRelPath
+            });
           }
         }
+        continue;
       }
-      continue;
-
-    case 'css':
-    case 'js':
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-        }
-      }
-      continue;
-
-    default:
-      {
-        const collection = allFiles[type];
-        for (const slot of collection) {
-          const key = slot[0];
-          const entry = slot[1];
-        }
-      }
-      continue;
     }
   }
-
-
-
 
 
 
@@ -1745,13 +1827,30 @@ async function buildWebsite(opts, command) {
           const pathTitle = sanitizePathTotitle(path.basename(entry.relativePath, entry.ext));
           let title = (entry.metaData?.frontMatter?.title || entry.metaData?.docTitle || pathTitle).trim();
 
+          // help ourselves mapping wikilink slots in other pages to this page:
+          registerPathMapping({
+            originator: UrlMappingSource.TITLE_EXTRACTION,
+            source: entry.metaData?.frontMatter?.title, 
+            target: entry.destinationRelPath
+          });
+          registerPathMapping({
+            originator: UrlMappingSource.TITLE_EXTRACTION,
+            source: entry.metaData?.docTitle, 
+            target: entry.destinationRelPath
+          });
+          registerPathMapping({
+            originator: UrlMappingSource.TITLE_EXTRACTION,
+            source: pathTitle, 
+            target: entry.destinationRelPath
+          });
+
           // clean up the title:
           title = title
           .replace(/:+$/, '')            // remove trailing ':' colons
           .replace(/\s*[?]+/g, '?')        // replace reams of question marks with a single '?'
           .trim();
 
-          if (DEBUG >= 1) console.log('TITLE extraction:', { sourcePath: entry.relativePath, meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle, title });
+          if (DEBUG >= 2) console.log('TITLE extraction:', { sourcePath: entry.relativePath, meta: entry.metaData, docTitle: entry.metaData?.docTitle, fmTitle: entry.metaData?.frontMatter?.title, pathTitle, title });
           if (title) {
             title = `<title>${title}</title>`;
           } else {
@@ -1818,6 +1917,113 @@ async function buildWebsite(opts, command) {
 
 
           if (DEBUG >= 3) console.log('update the file record after rendering the template:', { originalPath, entry: showRec(entry) });
+        }
+      }
+      continue;
+
+    case 'css':
+    case 'js':
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key: string = slot[0];
+          const entry: ResultFileRecord = slot[1];
+
+        }
+      }
+      continue;
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  // assistive files & dumps:
+  console.log('pathMapping dictionary:', pathMapping.values());
+  {
+    const destFilePath = unixify(path.join(opts.output, 'deGaulle.linkMappings'));
+
+    fs.writeFileSync(destFilePath, JSON.stringify(Array.from(pathMapping.values()), null, 2), 'utf8');
+
+    // also produce a source->target mapping file:
+    const sourceTargetMap = [];
+    for (const type in allFiles) {
+      switch (type) {
+        case '_':
+          continue;
+
+        case 'html':
+        case 'markdown':
+        case 'css':
+        case 'js':
+        default:
+          {
+            const collection = allFiles[type];
+            for (const slot of collection) {
+              const key: string = slot[0];
+              const entry: ResultHtmlFileRecord = slot[1];
+              const destFilePath = entry.destinationRelPath;
+              const originalPath = entry.relativePath;
+
+              sourceTargetMap.push({
+                source: originalPath,
+                target: destFilePath
+              });
+            }
+          }
+          continue;
+      }
+    }
+
+    const destFilePath2 = unixify(path.join(opts.output, 'deGaulle.sourceMappings'));
+
+    fs.writeFileSync(destFilePath2, JSON.stringify(sourceTargetMap, null, 2), 'utf8');
+  }
+
+
+
+
+
+
+
+
+
+  // now fixup all links:
+  console.log('Updating / Fixing all internal links...');
+
+  for (const type in allFiles) {
+    switch (type) {
+    case '_':
+    default:
+      continue;
+
+    case 'html':
+    case 'markdown':
+      {
+        const collection = allFiles[type];
+        for (const slot of collection) {
+          const key: string = slot[0];
+          const entry: ResultHtmlFileRecord = slot[1];
+          const destFilePath = unixify(path.join(opts.output, entry.destinationRelPath));
+          if (DEBUG >= 5) console.log(`!!!!!!!!!!!!!!!!!!!!!!!! Type [${type}] file record: copy '${entry.path}' --> '${destFilePath}'`);
+
+          const originalPath = entry.relativePath;
+
+          //entry.HtmlDocument = $doc;
+          //entry.HtmlBody = bodyEl;
+          //entry.HtmlHead = headEl;
+
+          //const linkCollection = getLinks($doc, entry.destinationRelPath);
+
+          if (DEBUG >= 3) console.log('update the file record after fixup of the links:', { originalPath, entry: showRec(entry) });
         }
       }
       continue;
@@ -1981,6 +2187,22 @@ async function compileMD(mdPath, md, allFiles) {
 
           if (t.type === 'front_matter') {
             metadata.frontMatter = t.meta;
+          }
+
+          if (t.__link) {
+            //console.log("MD link record?:", t);
+            registerPathMapping({
+              originator: UrlMappingSource.MARKDOWN_TRANSFORM,
+              source: t.__link.url,  
+              target: t.__linkTargetUrl,
+            });
+            if (0) {
+              registerPathMapping({
+                originator: UrlMappingSource.MARKDOWN_TRANSFORM,
+                source: t.__link.text,  
+                target: t.__linkTargetUrl,
+              });
+            }
           }
         });
         if (DEBUG >= 4) console.log('token types:', typeMap);
