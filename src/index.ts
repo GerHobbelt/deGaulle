@@ -136,19 +136,19 @@ interface MarkdownItEnvironment {
 
 enum UrlMappingSource {
   SOURCED_BY_NOBODY,
-  SOURCEFILE_NAME,    // MarkDown, HTML, Asset, ... 
+  SOURCEFILE_NAME,    // MarkDown, HTML, Asset, ...
   WIKILINK_PAGENAME,
   MARKDOWN_TRANSFORM,
   SLUGIFICATION,
   TITLE_EXTRACTION,
   POSTPROCESSING, // all sorts of transforms that happen during the "we'll fix it in post" final phase.
-};
+}
 
 interface UrlMappingRecord {
   originator: UrlMappingSource;
   source: string;
   target: string; // URL ?
-};
+}
 
 type UrlMappingCollection = Map<string, UrlMappingRecord>;
 
@@ -290,7 +290,7 @@ export default function main() {
 
 
 // special function which accepts an async callback and waits for it,
-// turning this call in a SYNCHRONOUS one. 
+// turning this call in a SYNCHRONOUS one.
 // Useful stuff when you're moving from sync code to async code
 //
 // Note: https://medium.com/@patarkf/synchronize-your-asynchronous-code-using-javascripts-async-await-5f3fa5b1366d#05ef
@@ -382,16 +382,16 @@ function __slugify4pathelement(el: string): string {
   // always surround these by '_' so they will stand out as before.
   // the remainder of this slugifier will take care of the potential
   // '_' duplicates, etc. in there...
-  el = el 
+  el = el
   .replace(/C\+\+/g, '_Cpp_');
 
   // Now do the slugging...
   el = slug(el, {
     mode: 'filename',
     replacement: '_',
-    allowed: /[^\p{L}\p{N}_~.-]/gu,
+    allowed: /[^\p{L}\p{N}_~.-]/gu
   });
-  // no mutiple dots allowed: 
+  // no mutiple dots allowed:
   // Dots are only tolerated in the inner sanctum of the directory name,
   // OR a single dot at the START of the name.
   // Nor do we tolerate tildes anywhere but at the start, and then ONE ONLY.
@@ -399,8 +399,8 @@ function __slugify4pathelement(el: string): string {
   // Underscores must not appear in groups either and are okay in the inner sanctum only.
   // Also, of all the ones we tolerate at the START, only a SINGLE ONE is permitted.
   // No riffing off .~_no_shall_do! We're a _Serious_ lot here!
-  let start = /^[.~]/.exec(el);
-  el = el 
+  const start = /^[.~]/.exec(el);
+  el = el
   .replace(/[_~.-][_~.-]+/g, '_')      // ellipsis, etc. --> '_'
   .replace(/^[_~.-]/g, '')
   .replace(/[_~.-]$/g, '');
@@ -419,8 +419,8 @@ function slugify4Path(filePath: string): string {
 }
 
 function slugify4PathExt(fileExtension: string): string {
-  // the leading dot will automatically be stripped! 
-  let dot = fileExtension.startsWith('.');
+  // the leading dot will automatically be stripped!
+  const dot = fileExtension.startsWith('.');
   if (dot) {
     fileExtension = fileExtension.slice(1);
   }
@@ -430,10 +430,8 @@ function slugify4PathExt(fileExtension: string): string {
 
   fileExtension = __slugify4pathelement(fileExtension);
   if (fileExtension.length) {
-    if (dot)
-      return '.' + fileExtension;
-    else
-      return fileExtension;
+    if (dot) { return '.' + fileExtension; }
+    return fileExtension;
   }
   return '';
 }
@@ -513,19 +511,16 @@ function cyrb53hash(str: string, seed = 0) {
 const pathMapping: UrlMappingCollection = new Map<string, UrlMappingRecord>();
 
 function registerPathMapping(mapRecord: UrlMappingRecord) {
-  let key = mapRecord.source;
+  const key = mapRecord.source;
 
   // sanity checks before we register anything:
   // do not register entries which map a source onto itself to prevent cycles:
-  if (mapRecord.source === mapRecord.target)
-    return;
-  if (mapRecord.source == null)
-    return;
+  if (mapRecord.source === mapRecord.target) { return; }
+  if (mapRecord.source == null) { return; }
 
   if (pathMapping.has(key)) {
-    let oldRec = pathMapping.get(key);
-    if (mapRecord.source === oldRec.source && mapRecord.target === oldRec.target)
-      return;      // no change, don't bother about it
+    const oldRec = pathMapping.get(key);
+    if (mapRecord.source === oldRec.source && mapRecord.target === oldRec.target) { return; }      // no change, don't bother about it
     if (mapRecord.source === oldRec.source) {
       // an update!
       registerPathMapping({
@@ -542,14 +537,14 @@ function registerPathMapping(mapRecord: UrlMappingRecord) {
 }
 
 function followPathMapping(src: string) : UrlMappingRecord {
-  let rec: UrlMappingRecord = {
+  const rec: UrlMappingRecord = {
     originator: UrlMappingSource.SOURCED_BY_NOBODY,
     source: src,
-    target: src,
+    target: src
   };
 
   while (pathMapping.has(src)) {
-    let rec = pathMapping.get(src);
+    const rec = pathMapping.get(src);
     src = rec.source;
   }
 
@@ -615,6 +610,19 @@ function calculateRelativeJumpToBasePath(relativeDirPath: string) : string {
   const jumpbackPath = (new Array(destDepthArr.length + 1)).join('../');
   return (relativeDirPath === '' ? './' : jumpbackPath);
 }
+
+
+function mk_unique_path(filePath: string, list: Map<string, ResultHtmlFileRecord>) {
+  const ext = path.extname(filePath);
+  const name = filePath.slice(0, filePath.length - ext.length);
+  const seqnum = 2;
+
+  for (;;) {
+    const testPath = name + `_${seqnum}` + ext;
+    if (!list.has(testPath)) { return testPath; }
+  }
+}
+
 
 
 
@@ -800,7 +808,7 @@ async function loadConfigScript(configScript : string) {
     if (DEBUG >= 1)  console.log(`loadConfigScript(prepped: '${configScript}')`);
     try {
       const processors = await import('file://' +  configScript);
-      console.log("processors keys:", Object.keys(processors));
+      console.log('processors keys:', Object.keys(processors));
       return processors;
     } catch (err) {
       console.error('######## ERROR: ', err);
@@ -810,9 +818,9 @@ async function loadConfigScript(configScript : string) {
   } else {
     return new Promise((resolve, reject) => {
       const processors = {
-        default: function nil() {
+        'default': function nil() {
           // no op
-        },
+        }
       };
       resolve(processors);
     });
@@ -853,7 +861,6 @@ async function globDirectory(pathWithWildCards : string, globConfig) : Promise<A
     });
   });
 }
-
 
 
 
@@ -899,14 +906,14 @@ async function buildWebsite(opts, command) {
       srcPath1 = unixify(path.join(process.cwd(), srcPath1));
     }
     const searchDirList = [
-      unixify(path.join(srcPath1, '.deGaulle')), 
-      unixify(path.join(process.cwd(), '.deGaulle')), 
-      unixify(srcPath1), 
-      unixify(process.cwd()), 
+      unixify(path.join(srcPath1, '.deGaulle')),
+      unixify(path.join(process.cwd(), '.deGaulle')),
+      unixify(srcPath1),
+      unixify(process.cwd())
     ];
 
-    for (let p of searchDirList) {
-      let cfgpath = unixify(path.join(p, configScript));
+    for (const p of searchDirList) {
+      const cfgpath = unixify(path.join(p, configScript));
       if (DEBUG >= 1) console.log(`Looking in ${ cfgpath } for CONFIG FILE.`);
       if (fs.existsSync(cfgpath)) {
         configScript = cfgpath;
@@ -1493,7 +1500,7 @@ async function buildWebsite(opts, command) {
 
         registerPathMapping({
           originator: UrlMappingSource.WIKILINK_PAGENAME,
-          source: pageName, 
+          source: pageName,
           target: rv
         });
         return rv;
@@ -1641,18 +1648,6 @@ async function buildWebsite(opts, command) {
   {
     const collisionCheckMap = new Map<string, ResultHtmlFileRecord>();
 
-    function mk_unique_path(filePath: string, list: Map<string, ResultHtmlFileRecord>) {
-      let ext = path.extname(filePath);
-      let name = filePath.slice(0, filePath.length - ext.length);
-      let seqnum = 2;
-
-      for (;;) {
-        let testPath = name + `_${seqnum}` + ext;
-        if (!list.has(testPath))
-          return testPath;
-      }
-    }
-
     for (const type in allFiles) {
       switch (type) {
       case '_':
@@ -1668,7 +1663,7 @@ async function buildWebsite(opts, command) {
           for (const slot of collection) {
             const key = slot[0];
             const entry = slot[1];
-            
+
             let pathkey = entry.destinationRelPath;
 
             // only *.js and [misc] files can have aleading dot in their filename;
@@ -1682,16 +1677,16 @@ async function buildWebsite(opts, command) {
             }
 
             if (collisionCheckMap.has(pathkey)) {
-              let old = collisionCheckMap.get(pathkey);
-              console.log("WARNING: collision for ", old, "vs.", slot); 
+              const old = collisionCheckMap.get(pathkey);
+              console.log('WARNING: collision for ', old, 'vs.', slot);
               entry.destinationRelPath = mk_unique_path(pathkey, collisionCheckMap);
             }
 
-            // only now that we've guaranteed that we have unique destination paths, can we 
+            // only now that we've guaranteed that we have unique destination paths, can we
             // safely and sanely register the mapping of source to destination:
             registerPathMapping({
               originator: UrlMappingSource.SOURCEFILE_NAME,
-              source: entry.relativePath, 
+              source: entry.relativePath,
               target: entry.destinationRelPath
             });
           }
@@ -1831,17 +1826,17 @@ async function buildWebsite(opts, command) {
           // help ourselves mapping wikilink slots in other pages to this page:
           registerPathMapping({
             originator: UrlMappingSource.TITLE_EXTRACTION,
-            source: entry.metaData?.frontMatter?.title, 
+            source: entry.metaData?.frontMatter?.title,
             target: entry.destinationRelPath
           });
           registerPathMapping({
             originator: UrlMappingSource.TITLE_EXTRACTION,
-            source: entry.metaData?.docTitle, 
+            source: entry.metaData?.docTitle,
             target: entry.destinationRelPath
           });
           registerPathMapping({
             originator: UrlMappingSource.TITLE_EXTRACTION,
-            source: pathTitle, 
+            source: pathTitle,
             target: entry.destinationRelPath
           });
 
@@ -1958,29 +1953,29 @@ async function buildWebsite(opts, command) {
     const sourceTargetMap = [];
     for (const type in allFiles) {
       switch (type) {
-        case '_':
-          continue;
+      case '_':
+        continue;
 
-        case 'html':
-        case 'markdown':
-        case 'css':
-        case 'js':
-        default:
-          {
-            const collection = allFiles[type];
-            for (const slot of collection) {
-              const key: string = slot[0];
-              const entry: ResultHtmlFileRecord = slot[1];
-              const destFilePath = entry.destinationRelPath;
-              const originalPath = entry.relativePath;
+      case 'html':
+      case 'markdown':
+      case 'css':
+      case 'js':
+      default:
+        {
+          const collection = allFiles[type];
+          for (const slot of collection) {
+            const key: string = slot[0];
+            const entry: ResultHtmlFileRecord = slot[1];
+            const destFilePath = entry.destinationRelPath;
+            const originalPath = entry.relativePath;
 
-              sourceTargetMap.push({
-                source: originalPath,
-                target: destFilePath
-              });
-            }
+            sourceTargetMap.push({
+              source: originalPath,
+              target: destFilePath
+            });
           }
-          continue;
+        }
+        continue;
       }
     }
 
@@ -2194,14 +2189,14 @@ async function compileMD(mdPath, md, allFiles) {
             //console.log("MD link record?:", t);
             registerPathMapping({
               originator: UrlMappingSource.MARKDOWN_TRANSFORM,
-              source: t.__link.url,  
-              target: t.__linkTargetUrl,
+              source: t.__link.url,
+              target: t.__linkTargetUrl
             });
             if (0) {
               registerPathMapping({
                 originator: UrlMappingSource.MARKDOWN_TRANSFORM,
-                source: t.__link.text,  
-                target: t.__linkTargetUrl,
+                source: t.__link.text,
+                target: t.__linkTargetUrl
               });
             }
           }
