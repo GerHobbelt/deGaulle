@@ -19,6 +19,8 @@ build: report-config lintfix bundle test coverage todo doc
 
 buildquick: bundle doc
 
+buildqiqqa: bundle qiqqa
+
 lint:
 	eslint .
 

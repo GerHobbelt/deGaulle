@@ -33,6 +33,8 @@ import fs from 'fs';
 
 let DEBUG = 1;
 
+type AsyncCallbackFn = () => Promise<boolean>;
+
 const markdownTokens: Record<string, boolean> = {};
 
 interface MetaDataRecord {
@@ -182,14 +184,17 @@ export default function main() {
       flag: false,
       help: 'directory to write results to'
     })
-    .callback(async function (opts, cmd) {
-      try {
-        await buildWebsite(opts, cmd);
-      } catch (ex) {
-        console.error(`ERROR: ${ex.message}\n\nException:\n`);
-        console.error(ex);
-        process.exit(5);
-      }
+    .callback((opts, cmd) => {
+      handleAsyncFunction(async function () {
+        try {
+          await buildWebsite(opts, cmd);
+        } catch (ex) {
+          console.error(`ERROR: ${ex.message}\n\nException:\n`);
+          console.error(ex);
+          process.exit(5);
+        }
+        return true;
+      });
     })
     .help('build website from sources');
 
@@ -209,14 +214,17 @@ export default function main() {
       abbr: 'o',
       help: 'file to write results to'
     })
-    .callback(async function (opts, cmd) {
-      try {
-        await buildWebsite(opts, cmd);
-      } catch (ex) {
-        console.error(`ERROR: ${ex.message}\n\nException:\n`);
-        console.error(ex);
-        process.exit(5);
-      }
+    .callback((opts, cmd) => {
+      handleAsyncFunction(async function () {
+        try {
+          await buildWebsite(opts, cmd);
+        } catch (ex) {
+          console.error(`ERROR: ${ex.message}\n\nException:\n`);
+          console.error(ex);
+          process.exit(5);
+        }
+        return true;
+      });
     })
     .help('run the sanity tests');
 
@@ -240,14 +248,17 @@ export default function main() {
         return `version ${pkg.version}`;
       }
     })
-    .callback(async function (opts, cmd) {
-      try {
-        await buildWebsite(opts, cmd);
-      } catch (ex) {
-        console.error(`ERROR: ${ex.message}\n\nException:\n`);
-        console.error(ex);
-        process.exit(5);
-      }
+    .callback((opts, cmd) => {
+      handleAsyncFunction(async function () {
+        try {
+          await buildWebsite(opts, cmd);
+        } catch (ex) {
+          console.error(`ERROR: ${ex.message}\n\nException:\n`);
+          console.error(ex);
+          process.exit(5);
+        }
+        return true;
+      });
     });
 
   nomnom.parse();
@@ -258,6 +269,24 @@ export default function main() {
 // -- done --
 
 
+// special function which accepts an async callback and waits for it,
+// turning this call in a SYNCHRONOUS one. 
+// Useful stuff when you're moving from sync code to async code
+//
+// Note: https://medium.com/@patarkf/synchronize-your-asynchronous-code-using-javascripts-async-await-5f3fa5b1366d#05ef
+function handleAsyncFunction(f: AsyncCallbackFn) {
+  try {
+    f()
+      .then((x) => {
+        console.log(x);
+      })
+      .catch(error => {
+        console.log(error);
+      });
+  } catch (error) {
+    console.log(error);
+  }
+}
 
 function unixify(path : string) : string {
   return path.replace(/\\/g, '/');
@@ -2201,7 +2230,7 @@ async function renderHTML(htmlPath, allFiles) {
 
     const $doc = el.HtmlDocument;
     const bodyEl = el.HtmlBody;
-    const headEl = el.htmlHead;
+    const headEl = el.HtmlHead;
 
     if (DEBUG >= 3) console.log('HTML:\n', showRec({ html: $doc, body: bodyEl.html(), head: headEl.html() }));
 
