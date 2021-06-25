@@ -109,5 +109,9 @@ qiqqa:
 	dist/cli.js build -d 9 ../qiqqa/docs-src/ --output ./docs-qiqqa/ --config ../qiqqa/docs-src/site-builder.mjs
 
 
+serve:
+	 npx @gerhobbelt/live-server --version 
+	 npx @gerhobbelt/live-server -V --host=localhost --no-browser .
+
 .PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile qiqqa
 .SILENT: help todo report-config

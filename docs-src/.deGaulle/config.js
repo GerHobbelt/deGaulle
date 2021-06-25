@@ -343,4 +343,11 @@ const cfg = {
   },
 };
 
-export default cfg;
+const greet = () => {
+  return 'hi user!'
+}
+export { greet };
+export const dummy = 'Max';
+
+export { cfg };
+export default function adam(eve) {}

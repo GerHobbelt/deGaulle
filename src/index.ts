@@ -637,13 +637,13 @@ async function loadConfigScript(configScript : string) {
     // https://stackoverflow.com/questions/42453683/how-to-reject-in-async-await-syntax
     if (DEBUG >= 1)  console.log(`loadConfigScript(${configScript})`);
     if (!path.isAbsolute(configScript)) {
-      // make sure `import` sees a './'-based relative path, or it barf a hairball as it will treat the base directory as a package identifier instead!
+      // make sure `import` sees a './'-based relative path, or it barfs a hairball as it will treat the base directory as a package identifier instead!
       configScript = unixify(path.join(process.cwd(), configScript));
     }
     if (DEBUG >= 1)  console.log(`loadConfigScript(prepped: '${configScript}')`);
     try {
       const processors = await import('file://' +  configScript);
-      throw 1;
+      console.log("processors keys:", Object.keys(processors));
       return processors;
     } catch (err) {
       console.error('######## ERROR: ', err);
@@ -736,10 +736,15 @@ async function buildWebsite(opts, command) {
   // e.g. as part of the website itself.
   //
   if (!path.isAbsolute(configScript)) {
+    let srcPath1 = paths[0];
+    if (!path.isAbsolute(srcPath1)) {
+      // make path absolute
+      srcPath1 = unixify(path.join(process.cwd(), srcPath1));
+    }
     const searchDirList = [
-      unixify(path.join(paths[0], '.deGaulle')), 
+      unixify(path.join(srcPath1, '.deGaulle')), 
       unixify(path.join(process.cwd(), '.deGaulle')), 
-      unixify(paths[0]), 
+      unixify(srcPath1), 
       unixify(process.cwd()), 
     ];
 
@@ -1744,12 +1749,21 @@ async function buildWebsite(opts, command) {
     <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700|Poppins:400,400i,500,700,700i&amp;subset=latin-ext" rel="stylesheet">
     <link rel="stylesheet" href="${entry.relativeJumpToBasePath}css/mini-default.css">
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+.container {
+    margin: 0 auto;
+    padding: 0 1rem;
+    max-width: 65rem;
+}    
+    </style>
     ${ htmlHead.html() }
   </head>
   <body>
     ${ fm || '' }
 
+    <article class="container">
     ${ htmlBody.html() }
+    </article>
 
     <footer>
       © 2020 Qiqqa Contributors ::

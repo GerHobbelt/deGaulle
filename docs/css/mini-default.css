@@ -736,7 +736,7 @@ a:hover, a:focus {
   --form-back-color: #f0f0f0;
   --form-fore-color: #111;
   --form-border-color: #ddd;
-  --input-back-color: #f8f8f8;
+  --input-back-color: #fffedc; /* #f8f8f8; */
   --input-fore-color: #111;
   --input-border-color: #ddd;
   --input-focus-color: #0288d1;
