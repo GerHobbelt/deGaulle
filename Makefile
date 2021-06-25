@@ -17,6 +17,8 @@ GITHUB_PROJ := https://github.com//GerHobbelt/${NPM_PACKAGE}
 
 build: report-config lintfix bundle test coverage todo doc
 
+buildquick: bundle doc
+
 lint:
 	eslint .
 
@@ -99,12 +101,12 @@ report-config:
 doc:
 	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
-	dist/cli.js -d build docs-src/ --output ./docs/
+	dist/cli.js build -d 9 docs-src/ --output ./docs/
 
 qiqqa:
 	#npx deGaulle build ../qiqqa/docs-src/ ./docs/
 	#npx deGaulle build docs-src/
-	dist/cli.js -d build ../qiqqa/docs-src/ --output ./docs-qiqqa/ --config ../qiqqa/docs-src/site-builder.mjs
+	dist/cli.js build -d 9 ../qiqqa/docs-src/ --output ./docs-qiqqa/ --config ../qiqqa/docs-src/site-builder.mjs
 
 
 .PHONY: doc clean superclean prep prep-ci report-config publish lint lintfix format test todo coverage report-coverage doc build gh-doc bundle compile qiqqa
