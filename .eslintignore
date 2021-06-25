@@ -1,5 +1,6 @@
 coverage/
 dist/
 docs-qiqqa/
+js/
 node_modules
 *.d.ts
