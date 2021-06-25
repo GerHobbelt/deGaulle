@@ -1486,9 +1486,10 @@ async function buildWebsite(opts, command) {
     wikilinks: {
       postProcessPageName: function (pageName) {
         const rv = myCustomPageNamePostprocessor(pageName);
-        if (DEBUG >= 2) console.log('wikilink transform:', { 'in': pageName, out: rv });
+        if (DEBUG >= 1) console.log('wikilink transform:', { 'in': pageName, out: rv });
 
         // TODO: check existence of target and report error + suggestion if absent!
+        //throw Error(rv);
 
         registerPathMapping({
           originator: UrlMappingSource.WIKILINK_PAGENAME,
