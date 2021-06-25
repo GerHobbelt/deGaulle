@@ -217,7 +217,7 @@ export default function main() {
     .callback((opts, cmd) => {
       handleAsyncFunction(async function () {
         try {
-          await buildWebsite(opts, cmd);
+          await sanityCheck(opts, cmd);
         } catch (ex) {
           console.error(`ERROR: ${ex.message}\n\nException:\n`);
           console.error(ex);
